@@ -24,6 +24,7 @@ public:
 	void fill(const Residual&);
 	void fill(const std::vector<Residual>&);
 
+
 	std::vector< std::pair<double, double> > getMeansOfPlanes();
 	std::vector< double > getRotationOfPlanes();
 
