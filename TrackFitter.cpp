@@ -5,9 +5,13 @@
  *      Author: cligtenb
  */
 
-#include "trackFitter.h"
+#include "TrackFitter.h"
 
 #include "/user/cligtenb/rootmacros/getObjectFromFile.h"
+#include "linearRegressionFit.h"
+#include "makeNoisyPixelMask.h"
+#include "transformHits.h"
+#include "ResidualHistogrammer.h"
 
 using namespace std;
 
@@ -56,7 +60,7 @@ bool trackFitter::passEvent(std::vector<std::vector<PositionHit> > spaceHit) {
 }
 
 void trackFitter::fitTracks(std::string outputfilename) {
-	residualHistograms=unique_ptr(new ResidualHistogrammer(outputfilename));
+	residualHistograms=unique_ptr<ResidualHistogrammer>(new ResidualHistogrammer(outputfilename, detector));
 
 	//loop over all entries
 	const long long nEvents=hitTable->GetEntriesFast(); //std::min( (long long) 2,);
@@ -72,15 +76,21 @@ void trackFitter::fitTracks(std::string outputfilename) {
 		std::vector<std::vector<PositionHit> > spaceHit;
 
 		//apply mask
-		auto itmask=mask.begin();
-		for(unsigned plane=0; plane<mimosaHit->size(); plane++ ) {
-			auto maskedHit = applyPixelMask( *itmask++ , mimosaHit->at(plane) ) ;
-			//convert hits to positions
-			spaceHit.push_back( convertHits(maskedHit, mimosa.planePosition[plane], mimosa.pixelsize, mimosa.pixelsize, plane) );
+		if(!mask.empty()) {
+			auto itmask=mask.begin();
+			for(unsigned plane=0; plane<mimosaHit->size(); plane++ ) {
+				auto maskedHit = applyPixelMask( *itmask++ , mimosaHit->at(plane) ) ;
+				//convert hits to positions
+				spaceHit.push_back( convertHits(maskedHit, detector.planePosition[plane], detector.pixelsize, detector.pixelsize, plane) );
+			}
 		}
 
 		if( !passEvent(spaceHit) ) continue;
 		++nPassed;
+
+		//apply translation and rotation
+		if(!shifts.empty()) spaceHit=translateHits(spaceHit,shifts);
+		if(!angles.empty()) spaceHit=rotateHits(spaceHit, angles);
 
 		//hough transform
 		auto houghClusters = houghTransform(spaceHit);
@@ -144,8 +154,46 @@ void trackFitter::fitTracks(std::string outputfilename) {
 	std::cout<<"passed: "<<nPassed<<"/"<<nEvents<<" with "<<nClusters<<"\n";
 
 
-	auto means=residualHistograms->getMeansOfPlanes();
-	auto rotation=residualHistograms->getRotationOfPlanes();
+}
 
-	for(auto& m : means ) cout<<m.first<<" "<<m.second<<endl;
+std::vector<std::pair<double, double> > trackFitter::getMeans() {
+	auto means= residualHistograms->getMeansOfPlanes();
+	for(auto& m : means ) cout<<"shift ("<<m.first<<", "<<m.second<<")"<<endl;
+	return means;
+}
+
+std::vector<double> trackFitter::getRotations() {
+	auto rotation= residualHistograms->getRotationOfPlanes();
+	for(auto& r : rotation ) cout<<"rotation: "<<r<<" = "<<r/M_PI*180.<<endl;
+	return rotation;
+}
+
+void trackFitter::setShifts(
+		const std::vector<std::pair<double, double> >& shiftsIn) {
+		shifts=shiftsIn;
+}
+
+void trackFitter::setAngles(const std::vector<double>& anglesIn) {
+	angles=anglesIn;
+}
+
+void trackFitter::addToShifts(
+		const std::vector<std::pair<double, double> >& shiftsExtra) {
+	if(shifts.empty()) return setShifts(shiftsExtra);
+
+	auto itExtra= shiftsExtra.begin();
+	for(auto& s : shifts) {
+		s.first+=itExtra->first;
+		s.second+=itExtra->second;
+		++itExtra;
+	}
+}
+
+void trackFitter::addToAngles(const std::vector<double>& anglesExtra) {
+	if(angles.empty()) return setAngles(anglesExtra);
+
+	auto itExtra=anglesExtra.begin();
+	for(auto& a : angles) {
+		a+=*itExtra++;
+	}
 }

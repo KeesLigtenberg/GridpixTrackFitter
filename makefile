@@ -1,5 +1,5 @@
 CC=g++
-SOURCES=FitTracks.cpp linearRegressionFit.cpp ResidualHistogrammer.cpp
+SOURCES=FitTracks.cpp linearRegressionFit.cpp ResidualHistogrammer.cpp TrackFitter.cpp makeNoisyPixelMask.cpp
 FASTJETPATH=/localstore/student/wpolarised/branches/branchkees/fastjet313
 EXECUTABLE=trackFitter
 LDFLAGS=`root-config --glibs`

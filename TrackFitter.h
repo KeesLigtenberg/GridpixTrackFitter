@@ -8,27 +8,17 @@
 #ifndef TRACKFITTER_H_
 #define TRACKFITTER_H_
 
-#include <iostream>
-#include <string>
-#include <vector>
-#include <cmath>
 #include <memory>
-#include <algorithm>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "TH1.h"
-#include "TTree.h"
-#include "TROOT.h"
-#include "TVirtualPad.h"
-#include "TCanvas.h"
-#include "TSystem.h"
-
-#include "makeNoisyPixelMask.h"
 #include "Hit.h"
-#include "PositionHit.h"
 #include "HoughTransformer.h"
-#include "transformHits.h"
+#include "PositionHit.h"
+#include "makeNoisyPixelMask.h"
 
-#include "DetectorConfiguration.h"
+class ResidualHistogrammer;
 
 class trackFitter {
 public:
@@ -36,6 +26,15 @@ public:
 	virtual ~trackFitter();
 
 	int makeMask(double ntimesThreshold=1e4);
+	void fitTracks( std::string outputfilename );
+
+	std::vector<std::pair<double,double>> getMeans();
+	std::vector<double> getRotations();
+
+	void setShifts( const std::vector<std::pair<double,double>>& shifts);
+	void addToShifts( const std::vector<std::pair<double,double>>& shifts );
+	void setAngles( const std::vector<double>& angles);
+	void addToAngles( const std::vector<double>& angles);
 private:
 	TFile* file;
 	TTree* hitTable;
@@ -45,12 +44,12 @@ private:
 	HoughTransformer houghTransform;
 	std::unique_ptr<ResidualHistogrammer> residualHistograms;
 
+	bool passEvent( std::vector<std::vector<PositionHit> > spaceHit ) ;	//return true if the event is passed
+
 	std::vector<pixelMask> mask;
 	std::vector<std::pair<double,double>> shifts;
 	std::vector<double> angles;
 
-	bool passEvent( std::vector<std::vector<PositionHit> > spaceHit ) ;	//return true if the event is passed
-	void fitTracks( std::string outputfilename );
 
 };
 

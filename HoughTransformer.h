@@ -13,6 +13,7 @@
 
 #include "PositionHit.h"
 #include "Hit.h"
+#include "DetectorConfiguration.h"
 
 struct HoughTransformer {
 
