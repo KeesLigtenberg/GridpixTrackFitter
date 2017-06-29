@@ -36,7 +36,7 @@ void ResidualHistogrammer::fill(const Residual& r) {
 
 	double xc=detector.planexmax()/2, yc= detector.planeymax()/2; //x and y center
 	double hx=h.x-xc, hy=h.y-yc;
-	plane.rotation.Fill( (hy*r.x-hx*r.y)/(hx*hx+hy*hy) );
+	plane.zRotation.Fill( (hy*r.x-hx*r.y)/(hx*hx+hy*hy) );
 }
 
 void ResidualHistogrammer::fill(const std::vector<Residual>& residuals) {
@@ -72,5 +72,20 @@ std::vector<double> ResidualHistogrammer::getRotationOfPlanes() {
 }
 
 double ResidualHistogrammer::PlaneHistograms::getRotationFromFit() {
-	return getMeanFromGausFit(rotation);
+	return getMeanFromGausFit(zRotation);
+}
+
+TrackHistogrammer::TrackHistogrammer(const DetectorConfiguration& detector) :
+	phi("trackPhi", "track #Phi; #phi [rad.]; tracks", 20,M_PI/2.-0.01,M_PI/2.+0.01),
+	d0("trackd0", "track d_{0}; d_{0} [mm]; tracks", 20, 0, detector.planexmax() ),
+	tanLambda("trackTanLambda", "track tan(#lambda); tan(#lambda); tracks", 20,-0.01,0.01),
+	z0("trackz0", "track z_{0}; z_{0} [mm]; tracks", 20, 0, detector.planeymax() ),
+	detector(detector)
+		{};
+
+void TrackHistogrammer::fill(TrackFitResult entry) {
+	phi.Fill(entry.phi);
+	d0.Fill(entry.d0);
+	tanLambda.Fill(entry.tanlambda);
+	z0.Fill(entry.z0);
 }

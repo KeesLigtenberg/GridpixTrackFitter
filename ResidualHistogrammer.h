@@ -38,14 +38,26 @@ public:
 			yResidual( ("yResidual_"+std::to_string(n)).c_str(), ("yResidual_"+std::to_string(n)).c_str(), 40, -0.2, 0.2),
 			xResidualByPixel( ("xResidualByPixel_"+std::to_string(n)).c_str(), ("xResidualByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 ),
 			yResidualByPixel( ("yResidualByPixel_"+std::to_string(n)).c_str(), ("yResidualByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 ),
-			rotation( ("rotation_"+std::to_string(n)).c_str(), ("rotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05)
+//			xRotation( ("xRotation_"+std::to_string(n)).c_str(), ("xRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
+//			yRotation( ("yRotation_"+std::to_string(n)).c_str(), ("yRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
+			zRotation( ("zRotation_"+std::to_string(n)).c_str(), ("zRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05)
 		{ ++n; }
 		std::pair<double,double> getMeansFromFit();
 		double getRotationFromFit();
 		TH1D xResidual, yResidual;
 		TProfile2D xResidualByPixel, yResidualByPixel;
-		TH1D rotation;
+		TH1D zRotation;// xRotation, yRotation;
 	} planeHist[6];
+};
+
+
+class TrackHistogrammer {
+public:
+	TrackHistogrammer(const DetectorConfiguration& detector);
+	void fill(TrackFitResult entry);
+private:
+	TH1D phi, d0, tanLambda, z0;
+	const DetectorConfiguration& detector;
 };
 
 
