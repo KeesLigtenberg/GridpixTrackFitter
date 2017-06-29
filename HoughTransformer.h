@@ -66,7 +66,7 @@ struct HoughTransformer {
 		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( xbins );
 		for(auto& v : houghGrid) v.resize(ybins);
 
-		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
+//		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
 		for( int plane=0; plane<nPlanes; plane++ ) {
 			for(auto& h : hv[plane] ) {
 				int binx= h.x/xmax*xbins;
@@ -79,7 +79,7 @@ struct HoughTransformer {
 				if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>(new HitCluster());
 				houghGrid.at(binx).at(biny)->add(h, plane);
 
-				graphicHistogram.Fill(binx,biny);
+//				graphicHistogram.Fill(binx,biny);
 			}
 		}
 
@@ -87,7 +87,8 @@ struct HoughTransformer {
 //		std::cout<<"drawing histogram of hough transform!"<<std::endl;
 //		graphicHistogram.Draw("colz");
 //		gPad->Update();
-//		if(std::cin.get()=='q') throw "exit";
+//		if(std::cin.get()=='q') { throw graphicHistogram; //serious abuse of language
+//		}
 
 		//get grid positions and sort by size
 		std::list< std::tuple<int, int, int> > gridPositions;
