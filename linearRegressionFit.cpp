@@ -9,7 +9,7 @@
 
 #include "linearRegressionFit.h"
 
-SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster ) {
+SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster, double er ) {
 
     double sumX = 0;
     double sumZ = 0;
@@ -41,7 +41,16 @@ SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster 
     double slope2     = (sumY * sumZ - ntot * sumYZ) / (sumZ * sumZ - ntot * sumZsquare);
     double intersept2 = (sumZ * sumYZ - sumZsquare * sumY) / (sumZ * sumZ - ntot * sumZsquare);
 
-    return SimpleFitResult {slope1, intersept1, slope2, intersept2};
+
+	double dslope1 = er / sqrt( sumZsquare - sumZ*sumZ/ntot );
+	double dintersept1 = dslope1 * sqrt( sumZsquare/ntot );
+	double dslope2 = er / sqrt( sumZsquare - sumZ*sumZ/ntot );
+	double dintersept2 = dslope1 * sqrt( sumZsquare/ntot );
+
+
+    return SimpleFitResult {
+    	slope1, intersept1, slope2, intersept2,
+    	dslope1, dintersept1, dslope2, dintersept2};
 }
 
 TrackFitResult linearRegressionTrackFit(const HoughTransformer::HitCluster& cluster) {
