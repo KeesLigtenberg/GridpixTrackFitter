@@ -7,6 +7,9 @@
 
 #include "TrackFitter.h"
 
+#include "TSystem.h"
+#include "TView.h"
+
 #include "/user/cligtenb/rootmacros/getObjectFromFile.h"
 #include "linearRegressionFit.h"
 #include "makeNoisyPixelMask.h"
@@ -35,6 +38,8 @@ trackFitter::trackFitter(std::string inputfile, const DetectorConfiguration& det
 
 trackFitter::~trackFitter() {
 	file->Close();
+	residualHistograms=nullptr; //make sure to close residualHistograms before track
+	trackHistograms=nullptr; //todo: combine both in a proper way;
 }
 
 int trackFitter::makeMask(double ntimesThreshold) {
@@ -61,6 +66,7 @@ bool trackFitter::passEvent(std::vector<std::vector<PositionHit> > spaceHit) {
 
 void trackFitter::fitTracks(std::string outputfilename) {
 	residualHistograms=unique_ptr<ResidualHistogrammer>(new ResidualHistogrammer(outputfilename, detector));
+	if(makeTrackHistograms) trackHistograms=unique_ptr<TrackHistogrammer>(new TrackHistogrammer(detector) );
 
 	//loop over all entries
 	const long long nEvents=hitTable->GetEntriesFast(); //std::min( (long long) 2,);
@@ -134,21 +140,35 @@ void trackFitter::fitTracks(std::string outputfilename) {
 			residuals=calculateResiduals(hitCluster, fit);
 			residualHistograms->fill(residuals);
 			fits.push_back(fit);
+
+			if(makeTrackHistograms) { trackHistograms->fill(fit); }
+		}
+
+		if(displayEvent) {
+//			HoughTransformer::drawClusters(spaceHit, detector);
+			HoughTransformer::drawClusters(houghClusters, detector);
+			for(auto& f : fits) f.draw(0, detector.planePosition.back());
+			gPad->Update();
+			auto signal=std::cin.get();
+			if(signal=='q') break;
+			else if(signal=='l') {
+				while(!gSystem->ProcessEvents()) {
+				   gSystem->Sleep(50);
+				}
+				break;
+			} else if(signal=='w') {
+				//rotate and write as animated gif!
+				double phiView=40;
+				for(int thetaView=0; thetaView<360; thetaView+=2 ) {
+				   gPad->GetView()->RotateView(thetaView,phiView);
+				   gPad->Modified();
+				   gPad->Update();
+				   gPad->Print( thetaView==358 ? "eventAnimation.gif++5++" : "eventAnimation.gif+5");
+				}
+			}
 		}
 
 
-//		HoughTransformer::drawClusters(spaceHit, mimosa);
-////		HoughTransformer::drawClusters(houghClusters, mimosa);
-//		for(auto& f : fits) f.draw(0, mimosa.planePosition.back());
-//		gPad->Update();
-//		auto signal=std::cin.get();
-//		if(signal=='q') break;
-//		else if(signal=='l') {
-//			while(!gSystem->ProcessEvents()) {
-//				gSystem->Sleep(50);
-//			}
-//			break;
-//		}
 
 	}
 	std::cout<<"passed: "<<nPassed<<"/"<<nEvents<<" with "<<nClusters<<"\n";
@@ -196,4 +216,12 @@ void trackFitter::addToAngles(const std::vector<double>& anglesExtra) {
 	for(auto& a : angles) {
 		a+=*itExtra++;
 	}
+}
+
+const std::vector<std::pair<double, double> >& trackFitter::getShifts() const {
+	return shifts;
+}
+
+const std::vector<double>& trackFitter::getAngles() const {
+	return angles;
 }

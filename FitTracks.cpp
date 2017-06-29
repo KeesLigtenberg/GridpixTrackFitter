@@ -2,8 +2,19 @@
 #include <iostream>
 
 #include "TROOT.h"
+#include "TGraph.h"
+
 #include "DetectorConfiguration.h"
 #include "TrackFitter.h"
+
+#include "/user/cligtenb/rootmacros/AllCombiner.h"
+
+#if 1 //root?
+#include "TrackFitter.cpp"
+#include "linearRegressionFit.cpp"
+#include "makeNoisyPixelMask.cpp"
+#include "ResidualHistogrammer.cpp"
+#endif
 
 using namespace std;
 
@@ -19,15 +30,55 @@ void FitTracks (std::string inputfile) {
 
 	trackFitter telescopeFitter(inputfile, mimosa);
 
-	telescopeFitter.makeMask();
+	telescopeFitter.makeMask(5e3);
 
 	const int nRepeatFit=5;
+
+	//initialise alignment parameters
+	double recursion[nRepeatFit],
+		shiftx[mimosa.nPlanes][nRepeatFit],
+		shifty[mimosa.nPlanes][nRepeatFit],
+		rotation[mimosa.nPlanes][nRepeatFit];
+
 	for(int i=0; i<nRepeatFit; i++) {
 				cout<<"fitting "<<i<<endl;
-				telescopeFitter.fitTracks("residualHistograms.root"); //"+to_string(i)+"
+//				if(i==4) telescopeFitter.displayEvent=true;
+				if(i==4) telescopeFitter.makeTrackHistograms=true;
+
+				telescopeFitter.fitTracks("residualHistograms"+to_string(i)+".root"); //
 				telescopeFitter.addToShifts( telescopeFitter.getMeans() );
 				telescopeFitter.addToAngles( telescopeFitter.getRotations() );
+
+				//store alignment parameters
+				recursion[i]=i;
+				for(int plane=0; plane<mimosa.nPlanes; ++plane) {
+					shiftx[plane][i]=telescopeFitter.getShifts().at(plane).first;
+					shifty[plane][i]=telescopeFitter.getShifts().at(plane).second;
+					rotation[plane][i]=telescopeFitter.getAngles().at(plane);
+				}
 	}
+
+
+	//create and combine graphs
+//	std::vector<TGraph*> shiftxGraph,shiftyGraph, rotationGraph;
+//	for(int plane=0;plane<mimosa.nPlanes; ++plane) {
+//		shiftxGraph.push_back( new TGraph(nRepeatFit, recursion, shiftx[plane]) );
+//		shiftyGraph.push_back( new TGraph(nRepeatFit, recursion, shifty[plane]) );
+//		rotationGraph.push_back( new TGraph(nRepeatFit, recursion, rotation[plane]) );
+//		for(const std::vector<TGraph*>& v: {shiftxGraph, shiftyGraph, rotationGraph}) {
+//			v.back()->SetTitle( ("plane "+to_string(plane+1)).c_str() );
+//		}
+//	}
+//
+//	AllCombiner<TGraph>  Xcombination("shiftsxCombined", shiftxGraph);
+//	AllCombiner<TGraph>  Ycombination("shiftsyCombined", shiftyGraph);
+//	AllCombiner<TGraph>  RotCombination("rotationCombined", rotationGraph);
+//
+//	std::vector<TCanvas*> canv;
+//	for(AllCombiner<TGraph>* comb : {&Xcombination, &Ycombination, &RotCombination}) {
+//		comb->setStyle(7);
+//		canv.push_back( comb->createCombined() );
+//	}
 
 }
 

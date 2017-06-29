@@ -19,6 +19,7 @@
 #include "makeNoisyPixelMask.h"
 
 class ResidualHistogrammer;
+class TrackHistogrammer;
 
 class trackFitter {
 public:
@@ -28,13 +29,18 @@ public:
 	int makeMask(double ntimesThreshold=1e4);
 	void fitTracks( std::string outputfilename );
 
-	std::vector<std::pair<double,double>> getMeans();
-	std::vector<double> getRotations();
+	std::vector<std::pair<double,double>> getMeans(); //not constant because adds fits!
+	const std::vector<std::pair<double,double>>& getShifts() const;
+	std::vector<double> getRotations(); //not constant because adds fits!
+	const std::vector<double>& getAngles() const;
 
 	void setShifts( const std::vector<std::pair<double,double>>& shifts);
 	void addToShifts( const std::vector<std::pair<double,double>>& shifts );
 	void setAngles( const std::vector<double>& angles);
 	void addToAngles( const std::vector<double>& angles);
+
+	bool displayEvent=false;
+	bool makeTrackHistograms=false;
 private:
 	TFile* file;
 	TTree* hitTable;
@@ -43,6 +49,7 @@ private:
 	const DetectorConfiguration& detector;
 	HoughTransformer houghTransform;
 	std::unique_ptr<ResidualHistogrammer> residualHistograms;
+	std::unique_ptr<TrackHistogrammer> trackHistograms;
 
 	bool passEvent( std::vector<std::vector<PositionHit> > spaceHit ) ;	//return true if the event is passed
 
