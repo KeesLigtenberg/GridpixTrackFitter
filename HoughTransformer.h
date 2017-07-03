@@ -23,7 +23,12 @@ struct HoughTransformer {
 		xmax(xmax), ymax(ymax), xbins(xbins), ybins(ybins) {};
 
 	struct HitCluster : std::list<PositionHit> {
-		int clusterSize=0, planeHit[nPlanes] = {0} ;
+		int clusterSize=0, planeHit[nPlanes] = {} ;
+		void add( PositionHit h ) {
+			push_back(h);
+			++clusterSize;
+			++planeHit[h.plane];
+		};
 		void add( PositionHit h, int plane ) {
 			push_back(h);
 			++clusterSize;
@@ -32,12 +37,13 @@ struct HoughTransformer {
 		void clear() {
 			 std::list<PositionHit>::clear();
 			 clusterSize=0;
+			 for(int i=0; i<nPlanes; i++) planeHit[i]=0;
 		};
 		void mergeWith(HitCluster& o) {
 			for(int i=0; i<nPlanes; i++) planeHit[i] += o.planeHit[i];
 			clusterSize+=o.clusterSize;
-			o.clusterSize=0;
 			splice(begin(), o);
+			o.clear();
 		}
 		int getNPlanesHit() const {
 			int n=0;
@@ -76,7 +82,7 @@ struct HoughTransformer {
 				if( binx<0 ) binx=0;
 				if( biny<0 ) biny=0;
 
-				if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>(new HitCluster());
+				if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>( new HitCluster() );
 				houghGrid.at(binx).at(biny)->add(h, plane);
 
 //				graphicHistogram.Fill(binx,biny);
@@ -87,7 +93,7 @@ struct HoughTransformer {
 //		std::cout<<"drawing histogram of hough transform!"<<std::endl;
 //		graphicHistogram.Draw("colz");
 //		gPad->Update();
-//		if(std::cin.get()=='q') { throw graphicHistogram; //serious abuse of language
+//		if(std::cin.get()=='q') { throw graphicHistogram; //abuse of throw mechanism
 //		}
 
 		//get grid positions and sort by size
@@ -111,7 +117,7 @@ struct HoughTransformer {
 			std::tie(size,i,j)=*it;
 
 			if(!houghGrid.at(i).at(j)) continue;
-			auto& currentCluster=*houghGrid.at(i).at(j);
+			auto& currentCluster= *houghGrid.at(i).at(j);
 			if(!currentCluster.clusterSize) continue;
 
 			for(int dx=-1; dx<=1; dx++) for(int dy=-1; dy<=1; dy++) {

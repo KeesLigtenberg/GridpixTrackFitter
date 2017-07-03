@@ -29,6 +29,13 @@ SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster,
 		ntot++;
     }
 
+    if(std::fabs(sumZ * sumZ - ntot * sumZsquare)<1E-20){
+    	std::cerr<<"error: (sumZ * sumZ - ntot * sumZsquare)<1E-20"<<endl;
+    	std::cerr<<"sumZ="<<sumZ<<" sumZsquare="<<sumZsquare<<" ntot="<<ntot<<endl;
+    	std::cerr<<cluster.size()<<" hits on "<<cluster.getNPlanesHit()<<" planes"<<endl;
+    	throw "(sumZ * sumZ - ntot * sumZsquare)<1E-20";
+    }
+
     // z <-> y from LinearTrackRegression::doRegressionX of marlinTPC
     /** gives back parameters for \n
      *  x = slope1 * z + intersept1\n

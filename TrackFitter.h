@@ -41,6 +41,12 @@ public:
 
 	bool displayEvent=false;
 	bool makeTrackHistograms=false;
+	bool recalculateCOM=true; //centre of mass
+	bool constructLineParallelToZ=false;
+
+	double maxResidual=0.2;
+
+	std::function<bool(const PositionHit&)> selectHitForRefit = [](const PositionHit&){return true;}; //select all hits by default
 private:
 	TFile* file;
 	TTree* hitTable;
@@ -56,6 +62,8 @@ private:
 	std::vector<pixelMask> mask;
 	std::vector<std::pair<double,double>> shifts;
 	std::vector<double> angles;
+	std::vector<std::pair<double,double>> hitsCentreOfMass, averageResidualFromSum;
+	std::vector<double> rotationZFromSum;
 
 
 };

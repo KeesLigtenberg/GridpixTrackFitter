@@ -22,6 +22,9 @@ struct SimpleFitResult {
 		TPolyLine3D l( npoints, x, y, z );
 		l.DrawClone();
 	}
+	bool isValid() {
+		return !(std::isnan(slope1) || std::isnan(slope2) || std::isnan(intersept1) || std::isnan(intersept2) );
+	}
 };
 struct TrackFitResult {
 	TrackFitResult(const SimpleFitResult& fr) : //TODO: check! this was before y <-> z

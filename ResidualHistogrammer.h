@@ -21,8 +21,8 @@ public:
 	ResidualHistogrammer(std::string outputFileName, const DetectorConfiguration& detector);
 	virtual ~ResidualHistogrammer();
 
-	void fill(const Residual&);
-	void fill(const std::vector<Residual>&);
+	void fill(const Residual&, const std::pair<double, double>& rotationPoint);
+	void fill(const std::vector<Residual>&, const std::vector<std::pair<double, double> >& rotationPoints);
 
 
 	std::vector< std::pair<double, double> > getMeansOfPlanes();
@@ -34,20 +34,22 @@ public:
 	struct PlaneHistograms {
 		static int n;
 		PlaneHistograms() :
-			xResidual( ("xResidual_"+std::to_string(n)).c_str(), ("xResidual_"+std::to_string(n)).c_str(), 40, -0.2, 0.2),
-			yResidual( ("yResidual_"+std::to_string(n)).c_str(), ("yResidual_"+std::to_string(n)).c_str(), 40, -0.2, 0.2),
+			xResidual( ("xResidual_"+std::to_string(n)).c_str(), ("xResidual_"+std::to_string(n)).c_str(), 40, -0.4, 0.4),
+			yResidual( ("yResidual_"+std::to_string(n)).c_str(), ("yResidual_"+std::to_string(n)).c_str(), 40, -0.4, 0.4),
+			zRotation( ("zRotation_"+std::to_string(n)).c_str(), ("zRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
 			xResidualByPixel( ("xResidualByPixel_"+std::to_string(n)).c_str(), ("xResidualByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 ),
 			yResidualByPixel( ("yResidualByPixel_"+std::to_string(n)).c_str(), ("yResidualByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 ),
 //			xRotation( ("xRotation_"+std::to_string(n)).c_str(), ("xRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
 //			yRotation( ("yRotation_"+std::to_string(n)).c_str(), ("yRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
-			zRotation( ("zRotation_"+std::to_string(n)).c_str(), ("zRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05)
+			zRotationByPixel( ("zRotationByPixel_"+std::to_string(n)).c_str(), ("zRotationByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 )
 		{ ++n; }
 		std::pair<double,double> getMeansFromFit();
 		double getRotationFromFit();
 		TH1D xResidual, yResidual;
-		TProfile2D xResidualByPixel, yResidualByPixel;
 		TH1D zRotation;// xRotation, yRotation;
+		TProfile2D xResidualByPixel, yResidualByPixel, zRotationByPixel;
 	} planeHist[6];
+
 };
 
 
