@@ -3,7 +3,8 @@
 #include <iostream>
 
 #include "TH2.h"
-#include "/user/cligtenb/rootmacros/getHistFromTree.h"
+//#include "/user/cligtenb/rootmacros/getHistFromTree.h"
+#include "getHistFromTree.h"
 
 //threshold is maximum of number times mean
 pixelMask makeNoisyPixelMask(TTree* hitTable, int plane, double threshold, std::pair<int,int> gridsize ) {

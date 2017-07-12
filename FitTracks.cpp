@@ -3,11 +3,13 @@
 
 #include "TROOT.h"
 #include "TGraph.h"
+#include "TH1.h"
 
+#include "AllCombiner.h"
 #include "DetectorConfiguration.h"
 #include "TrackFitter.h"
 
-#include "/user/cligtenb/rootmacros/AllCombiner.h"
+//#include "/user/cligtenb/rootmacros/AllCombiner.h"
 
 #if 1 //root?
 #include "TrackFitter.cpp"
@@ -20,7 +22,8 @@ using namespace std;
 
 const DetectorConfiguration mimosa= {
 	6, //planes
-	{0, 18.6, 37.4, 116.7, 151.1, 188.4}, //plane position from Wolf thesis
+//	{0, 18.6, 37.4, 116.7, 151.1, 188.4}, //plane position from Wolf thesis
+	{0, 15.8, 31.8, 143.1, 161.55, 179.91 }, //plane positions as measured
 	0.0184, //pixelsize in mm
 	1153, 577 //row, column, ://one extra because exampleData starts at 1 and our data starts at 0 //TODO: change this to one or the other!
 };
@@ -39,6 +42,7 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 	trackFitter telescopeFitter(inputfile, mimosa);
 
 	telescopeFitter.makeMask(5e3);
+//	telescopeFitter.setShifts( { {0,0}, {0,0}, {0,0}, {0,0}, {0,1}, {0,0} } );
 
 	//initialise alignment parameters
 	double recursion[nRepeatFit],
@@ -51,12 +55,13 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 //				if(i==4) telescopeFitter.displayEvent=true;
 				if(i==4) telescopeFitter.makeTrackHistograms=true;
 
-				if(i<=1) telescopeFitter.selectHitForRefit=[](const PositionHit& h) {return h.plane==1 || h.plane==4;};
-				//else telescopeFitter.selectHitForRefit=[](const PositionHit& h) {return true;};
+				if(i<=2) telescopeFitter.selectHitForRefit=[](const PositionHit& h) {return h.plane==1 || h.plane==4;};
+				else telescopeFitter.selectHitForRefit=[](const PositionHit& h) {return true;};
 
 				if(i==1) telescopeFitter.constructLineParallelToZ=true;
 				else telescopeFitter.constructLineParallelToZ=false;
 
+				//fit tracks!
 				telescopeFitter.fitTracks("residualHistograms"+to_string(i)+".root");
 
 				auto means=telescopeFitter.getMeans();

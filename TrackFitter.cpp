@@ -10,7 +10,8 @@
 #include "TSystem.h"
 #include "TView.h"
 
-#include "/user/cligtenb/rootmacros/getObjectFromFile.h"
+//#include "/user/cligtenb/rootmacros/getObjectFromFile.h"
+#include "getObjectFromFile.h"
 #include "linearRegressionFit.h"
 #include "makeNoisyPixelMask.h"
 #include "transformHits.h"
@@ -20,7 +21,7 @@ using namespace std;
 
 trackFitter::trackFitter(std::string inputfile, const DetectorConfiguration& detector) :
 	detector(detector),
-	houghTransform(detector.planexmax(), detector.planeymax(), 50/*xbins*/, 25 /*ybins*/ ),
+	houghTransform(detector.planexmax(), detector.planeymax(), 30/*xbins*/, 15 /*ybins*/ ),
 	residualHistograms(nullptr),
 	hitsCentreOfMass(detector.nPlanes, {detector.planexmax()/2, detector.planeymax()/2} ), //initialise to regular centre of sensor
 	averageResidualFromSum(detector.nPlanes, {0,0} ), //initialise to zero
@@ -82,11 +83,16 @@ void trackFitter::fitTracks(std::string outputfilename) {
 	long int nPassed=0,nClusters=0;
 	for( int iEvent=0; iEvent<nEvents; iEvent++ ) {
 
-		if(!(iEvent%1000))
+		if(!(iEvent%10000))
 			std::cout<<"event "<<iEvent<<"/"<<nEvents<<std::endl;
 
 		//get entry
 		hitTable->GetEntry(iEvent);
+
+		if(!mimosaHit) {
+			cout<<"Did not find mimosaHit!"<<endl;
+			continue;
+		}
 
 		std::vector<std::vector<PositionHit> > spaceHit;
 
@@ -114,7 +120,7 @@ void trackFitter::fitTracks(std::string outputfilename) {
 		auto houghClusters = houghTransform(spaceHit);
 
 		//require at least 5/6 planes to be hit
-		const int nMinPlanesHit=5;
+		const int nMinPlanesHit=4;
 		houghClusters.remove_if([](const HoughTransformer::HitCluster& hc){return hc.getNPlanesHit()<nMinPlanesHit; });
 		if(!houghClusters.size()) {
 			continue;
@@ -182,8 +188,8 @@ void trackFitter::fitTracks(std::string outputfilename) {
 		}
 
 		if(displayEvent) {
-//			HoughTransformer::drawClusters(spaceHit, detector);
-			HoughTransformer::drawClusters(houghClusters, detector);
+			HoughTransformer::drawClusters(spaceHit, detector);
+//			HoughTransformer::drawClusters(houghClusters, detector);
 			for(auto& f : fits) f.draw(0, detector.planePosition.back());
 			gPad->Update();
 			auto signal=std::cin.get();
@@ -229,15 +235,15 @@ void trackFitter::fitTracks(std::string outputfilename) {
 }
 
 std::vector<std::pair<double, double> > trackFitter::getMeans() {
-	auto means= residualHistograms->getMeansOfPlanes();
-//	auto means= averageResidualFromSum;
+//	auto means= residualHistograms->getMeansOfPlanes();
+	auto means= averageResidualFromSum;
 	for(auto& m : means ) cout<<"shift ("<<m.first<<", "<<m.second<<")"<<endl;
 	return means;
 }
 
 std::vector<double> trackFitter::getRotations() {
-	auto rotation= residualHistograms->getRotationOfPlanes();
-//	auto rotation= rotationZFromSum;
+//	auto rotation= residualHistograms->getRotationOfPlanes();
+	auto rotation= rotationZFromSum;
 	for(auto& r : rotation ) cout<<"rotation: "<<r<<" = "<<r/M_PI*180.<<endl;
 	return rotation;
 }
