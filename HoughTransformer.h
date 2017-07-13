@@ -10,6 +10,7 @@
 #include "TTree.h"
 #include "TH2.h"
 #include "TPad.h"
+#include "TCanvas.h"
 
 #include "PositionHit.h"
 #include "Hit.h"
@@ -181,9 +182,8 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 	gStyle->SetMarkerStyle(20);
 	pointTree.Draw("h.z:h.y:h.x:h.ToT", "", "*");
 	TH1* axisObject= dynamic_cast<TH1*>( gPad->GetPrimitive("htemp") );
-	const double xmax=detector.planexmax(), ymax=detector.planeymax();
-	axisObject->GetXaxis()->SetLimits(0,xmax);
-	axisObject->GetYaxis()->SetLimits(0,ymax);
+	axisObject->GetXaxis()->SetLimits(detector.xmin(),detector.xmax());
+	axisObject->GetYaxis()->SetLimits(detector.ymin(),detector.ymax());
 	axisObject->DrawClone();
 	gPad->Update();
 }
@@ -194,42 +194,53 @@ struct TimePixHoughTransformer {
 
 	using HitCluster=HoughTransformer::HitCluster;
 
-	TimePixHoughTransformer( double zmin, double zmax, double ymax, int zbins, int ybins ) : zmin(zmin), zmax(zmax), ymax(ymax), zbins(zbins), ybins(ybins) {};
-	double zmin,zmax, ymax;
-	int zbins, ybins;
+	TimePixHoughTransformer( double xmin, double xmax, double ymax, int xbins, int ybins ) :
+		xmin(xmin), xmax(xmax), ymax(ymax), xbins(xbins), ybins(ybins) {};
+	double xmin,xmax, ymax;
+	int xbins, ybins;
 
-	std::list<HoughTransformer::HitCluster> operator() ( const std::vector<PositionHit>& hv, int minClusterSize=30, int minCandidateSize=20  ) {
+	int minClusterSize=30, minCandidateSize=20;
+
+
+	//angles in x and y plane
+	std::list<HoughTransformer::HitCluster> operator() ( const std::vector<PositionHit>& hv, double angleOfTracksX=0., double angleOfTracksY=0.  ) {
 
 		//construct grid
-		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( zbins ); //Houghgrid[z][y]
+		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( xbins ); //Houghgrid[z][y]
 		for(auto& v : houghGrid) v.resize(ybins);
 
-		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", zbins,0,zbins, ybins,0,ybins );
+
+		static TCanvas* canv=nullptr;
+		if(canv) canv->Clear();
+		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
 		for(auto& h : hv ) {
-			int binz= (h.z-zmin)/(zmax-zmin)*zbins;
-			int biny= h.y/ymax*ybins;
-			if( binz>=zbins ) binz=zbins-1;
+			int binx= (h.x-xmin-angleOfTracksX*h.z)/(xmax-xmin)*xbins;
+			int biny= (h.y-angleOfTracksY*h.z)/ymax*ybins;
+			if( binx>=xbins ) binx=xbins-1;
 			if( biny>=ybins ) biny=ybins-1;
-			if( binz<0 ) binz=0;
+			if( binx<0 ) binx=0;
 			if( biny<0 ) biny=0;
 
-			if(!houghGrid.at(binz).at(biny)) houghGrid.at(binz).at(biny)=std::unique_ptr<HitCluster>( new HitCluster() );
-			houghGrid.at(binz).at(biny)->add(h);
+			if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>( new HitCluster() );
+			houghGrid.at(binx).at(biny)->add(h);
 
-			graphicHistogram.Fill(binz,biny);
+			graphicHistogram.Fill(binx,biny);
 		}
 
 		//draw histogram
 		std::cout<<"drawing histogram of hough transform!"<<std::endl;
+		if(!canv) canv=new TCanvas("houghCanv", "Canvas with cluster histogram", 600,400);
+		canv->cd();
+
 		graphicHistogram.Draw("colz");
 		gPad->Update();
-		if(std::cin.get()=='q') {
-			throw graphicHistogram; //abuse of throw mechanism
-		}
+//		if(std::cin.get()=='q') {
+//			throw graphicHistogram; //abuse of throw mechanism
+//		}
 
 		//get grid positions and sort by size
 		std::list< std::tuple<int, int, int> > gridPositions;
-		for(int i=0; i<zbins; i++) {
+		for(int i=0; i<xbins; i++) {
 			for(int j=0; j<ybins; j++) {
 				if(houghGrid.at(i).at(j)) {
 					int size=houghGrid.at(i).at(j)->clusterSize;
@@ -252,7 +263,7 @@ struct TimePixHoughTransformer {
 			if(!currentCluster.clusterSize) continue;
 
 			for(int dx=-1; dx<=1; dx++) for(int dy=-1; dy<=1; dy++) {
-				if(i+dx<0 or i+dx >= zbins or j+dy<0 or j+dy >= ybins or (!dx and !dy) ) continue; //outside grid
+				if(i+dx<0 or i+dx >= xbins or j+dy<0 or j+dy >= ybins or (!dx and !dy) ) continue; //outside grid
 				if(! houghGrid.at(i+dx).at(j+dy) ) continue; //no hits in bin
 				currentCluster.mergeWith( *houghGrid.at(i+dx).at(j+dy) );
 			}

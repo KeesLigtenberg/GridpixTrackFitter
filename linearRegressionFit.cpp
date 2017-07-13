@@ -91,4 +91,6 @@ HoughTransformer::HitCluster&  cutOnResiduals( HoughTransformer::HitCluster& clu
 	return cluster;
 }
 
-
+std::ostream& operator <<(std::ostream& os, SimpleFitResult& fit) {
+	return os<<"SimpleFitResult: slopes("<<fit.slope1<<", "<<fit.slope2<<") intersepts("<<fit.intersept1<<", "<<fit.intersept2<<")";
+}

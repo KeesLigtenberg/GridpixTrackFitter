@@ -21,10 +21,14 @@
 
 using namespace std;
 
-DetectorConfiguration timePixChip {
-	1, {0}, //nplanes, planeposition
-	1, 256, 256 //pixelsize, xpixels, ypixels
-};
+struct TimePixDetectorConfiguration : DetectorConfiguration {
+	TimePixDetectorConfiguration() : DetectorConfiguration{
+		1, {0}, //nplanes, planeposition
+		1, 256, 256 //pixelsize, xpixels, ypixels
+	} {};
+	virtual double xmin() const {return -50E3; }
+	virtual double xmax() const {return 50E3; }
+} timePixChip;
 
 void FitTracksTimePix(std::string inputfile) {
 
@@ -38,7 +42,7 @@ void FitTracksTimePix(std::string inputfile) {
 	hitTable->SetBranchAddress("timepix", &timepixHits );
 //	hitTable->SetBranchAddress("trigger",&trigger);
 
-	TimePixHoughTransformer houghTransform(-150E3, 150E3, timePixChip.planeymax(), 100,8);
+	TimePixHoughTransformer houghTransform(timePixChip.xmin(),timePixChip.xmax(), timePixChip.ymax(), 100,24);
 
 	//loop over all entries
 	const long long nEvents=hitTable->GetEntriesFast();
@@ -54,13 +58,15 @@ void FitTracksTimePix(std::string inputfile) {
 		cout<<"got entry"<<endl;
 		std::vector<PositionHit> spaceHit;
 		double driftScale=1E-3;
+
+		//convert hits changes x <-> z!!
 		spaceHit=convertHits( *timepixHits, timePixChip.pixelsize, timePixChip.pixelsize, driftScale );
 
 		cout<<"drawing cluster"<<endl;
 
 //		HoughTransformer::drawCluster(spaceHit, timePixChip);
 
-		auto houghClusters = houghTransform(spaceHit);
+		auto houghClusters = houghTransform(spaceHit, 0, -0.16);
 
 		if(!houghClusters.size()) {
 			continue;
@@ -76,15 +82,22 @@ void FitTracksTimePix(std::string inputfile) {
 			auto fit=linearRegressionFit(hitCluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 
+			std::cout<<fit<<endl;
+
 			fits.push_back(fit);
 		}
 
-		HoughTransformer::drawClusters(spaceHit, timePixChip);
+
+		static TCanvas* canv=nullptr;
+		if(!canv) canv=new TCanvas("eventCanv", "canvas for event with fits", 600,400);
+		canv->cd();
+		HoughTransformer::drawCluster(spaceHit, timePixChip);
 //		HoughTransformer::drawClusters(houghClusters, detector);
-		for(auto& f : fits) f.draw(0, timePixChip.planePosition.back());
+		for(auto& f : fits) f.draw(0, 256);
+		gPad->Update();
 		if(std::cin.get()=='q') break;
 
-		}
+
 	}
 
 }

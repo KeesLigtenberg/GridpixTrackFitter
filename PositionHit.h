@@ -25,7 +25,7 @@ std::vector<PositionHit> convertHits(const std::vector<TimePixHit>& hv, double p
 		for(auto& h : hv) {
 			// .5 to center position in pixel
 			int plane=0;
-			phv.emplace_back( PositionHit{(h.column+.5)*pixelwidth, (h.row+.5)*pixelheight, h.driftTime*driftSpeed, plane, h.charge /*charge=ToT*/} );
+			phv.emplace_back( PositionHit{h.driftTime*driftSpeed /*z*/, (h.row+.5)*pixelheight /*y*/, (h.column+.5)*pixelwidth/*x*/, plane, h.charge /*charge=ToT*/} );
 		}
 		return phv;
 }

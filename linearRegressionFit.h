@@ -36,6 +36,8 @@ struct TrackFitResult {
 	double phi, d0, tanlambda, z0;
 };
 
+std::ostream& operator<<(std::ostream& os, SimpleFitResult& fit);
+
 SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster, double er=0 ) ;
 
 TrackFitResult linearRegressionTrackFit(const HoughTransformer::HitCluster& cluster);
