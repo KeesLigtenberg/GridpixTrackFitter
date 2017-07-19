@@ -16,8 +16,8 @@ int ResidualHistogrammer::PlaneHistograms::n=0;
 
 ResidualHistogrammer::ResidualHistogrammer(std::string outputFileName, const DetectorConfiguration& detector) :
 		outputFile(outputFileName.c_str(), "RECREATE"),
-		detector(detector),
-		planeHist()
+		planeHist(),
+		detector(detector)
 {
 	planeHist.reserve(detector.nPlanes);
 	for(int i=0; i<detector.nPlanes; ++i) planeHist.emplace_back( detector );
@@ -49,6 +49,10 @@ void ResidualHistogrammer::fill(const Residual& r, const std::pair<double, doubl
 void ResidualHistogrammer::fill(const std::vector<Residual>& residuals, const std::vector<std::pair<double, double> >& rotationPoint) {
 	if(!residuals.size()) return;
 	for(auto& r:residuals) fill(r, rotationPoint[r.h.plane]);
+}
+void ResidualHistogrammer::fill(const std::vector<Residual>& residuals, const std::pair<double, double>& rotationPoint) {
+	if(!residuals.size()) return;
+	for(auto& r:residuals) fill(r, rotationPoint);
 }
 
 //get x,y mean

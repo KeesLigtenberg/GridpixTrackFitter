@@ -33,6 +33,12 @@ hitCollection& translateHits( hitCollection& hits, const std::vector<std::pair<d
 	return hits;
 };
 
+template<class hitCollection>
+hitCollection& translateHits( hitCollection& hits, const std::pair<double,double>& translation ) {
+	for(PositionHit& h : hits) translateHit(h, translation );
+	return hits;
+};
+
 template<>
 std::vector<std::vector<PositionHit> >& translateHits( std::vector<std::vector<PositionHit> >& hits, const std::vector<std::pair<double,double> >& translation ) {
 	for(auto& v: hits)
@@ -45,6 +51,14 @@ template<class hitCollection>
 hitCollection& rotateHits(hitCollection& hits, const std::vector<double>& rotations, const std::vector<std::pair<double, double>>& rotationPoints ) {
 	for(PositionHit& h : hits) {
 		h=rotateHit(h,rotations[h.plane], rotationPoints[h.plane]);
+	}
+	return hits;
+}
+
+template<class hitCollection>
+hitCollection& rotateHits(hitCollection& hits, double rotations, const std::pair<double, double>& rotationPoints ) {
+	for(PositionHit& h : hits) {
+		h=rotateHit(h,rotations, rotationPoints);
 	}
 	return hits;
 }

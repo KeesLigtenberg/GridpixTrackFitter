@@ -23,6 +23,7 @@ public:
 
 	void fill(const Residual&, const std::pair<double, double>& rotationPoint);
 	void fill(const std::vector<Residual>&, const std::vector<std::pair<double, double> >& rotationPoints );
+	void fill(const std::vector<Residual>& residuals, const std::pair<double, double>& rotationPoint);
 	void fill(const std::vector<Residual>& residualVector) {
 		std::vector< std::pair<double,double> > rotationPoints(detector.nPlanes, detector.getCentre());
 		fill(residualVector, rotationPoints );

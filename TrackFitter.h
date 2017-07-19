@@ -66,7 +66,7 @@ private:
 	std::unique_ptr<ResidualHistogrammer> residualHistograms;
 	std::unique_ptr<TrackHistogrammer> trackHistograms;
 
-	bool passEvent( std::vector<std::vector<PositionHit> > spaceHit ) ;	//return true if the event is passed
+	bool passEvent( const std::vector<std::vector<PositionHit> >& spaceHit ) const;	//return true if the event is passed
 
 	std::vector<pixelMask> mask;
 	std::vector<std::pair<double,double>> shifts;

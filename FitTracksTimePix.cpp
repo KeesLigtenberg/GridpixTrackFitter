@@ -118,7 +118,7 @@ void FitTracksTimePix(std::string inputfile) {
 		++nPassed;
 
 		static TCanvas* canv=nullptr;
-		if(!canv) canv=new TCanvas("eventCanv", "canvas for event with fits", 600,400);
+		if(!canv) canv=new TCanvas("eventCanv", "canvas for event with fits", 900,600);
 		canv->cd();
 		HoughTransformer::drawCluster(spaceHit, timePixChip);
 //		HoughTransformer::drawClusters(houghClusters, detector);
