@@ -52,8 +52,9 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 
 	for(int i=0; i<nRepeatFit; i++) {
 				cout<<"fitting "<<i<<endl;
-//				if(i==4) telescopeFitter.displayEvent=true;
-				if(i==4) telescopeFitter.makeTrackHistograms=true;
+				if(i==4) telescopeFitter.displayEvent=true;
+
+				if(i>=3) telescopeFitter.makeTrackHistograms=true;
 
 				if(i<=2) telescopeFitter.selectHitForRefit=[](const PositionHit& h) {return h.plane==1 || h.plane==4;};
 				else telescopeFitter.selectHitForRefit=[](const PositionHit& h) {return true;};
@@ -80,6 +81,9 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 					break;
 				case 2:
 					telescopeFitter.addToAngles( rotations );
+					break;
+				case 3:
+					telescopeFitter.setSlopes( telescopeFitter.getSlopes() );
 					break;
 				default:
 					telescopeFitter.addToShifts( means );

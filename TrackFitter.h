@@ -33,11 +33,14 @@ public:
 	const std::vector<std::pair<double,double>>& getShifts() const;
 	std::vector<double> getRotations(); //not constant because adds fits!
 	const std::vector<double>& getAngles() const;
+	std::pair<double, double> getSlopes() const;
 
 	void setShifts( const std::vector<std::pair<double,double>>& shifts);
 	void addToShifts( const std::vector<std::pair<double,double>>& shifts );
 	void setAngles( const std::vector<double>& angles);
 	void addToAngles( const std::vector<double>& angles);
+	void setSlopes( std::pair<double, double> slopes);
+	int getEntry(int iEvent);
 
 	bool displayEvent=false;
 	bool makeTrackHistograms=false;
@@ -47,6 +50,12 @@ public:
 	double maxResidual=0.2;
 
 	std::function<bool(const PositionHit&)> selectHitForRefit = [](const PositionHit&){return true;}; //select all hits by default
+
+protected:
+	std::vector<std::vector<PositionHit> > getSpaceHits();
+	std::vector<std::vector<PositionHit> >&  rotateAndShift(
+			std::vector<std::vector<PositionHit> >& spaceHit);
+
 private:
 	TFile* file;
 	TTree* hitTable;
@@ -62,8 +71,10 @@ private:
 	std::vector<pixelMask> mask;
 	std::vector<std::pair<double,double>> shifts;
 	std::vector<double> angles;
-	std::vector<std::pair<double,double>> hitsCentreOfMass, averageResidualFromSum;
+	std::vector<std::pair<double,double>> hitsCentre, averageResidualFromSum;
 	std::vector<double> rotationZFromSum;
+
+	double slope1FromSum, slope2FromSum;
 
 
 };

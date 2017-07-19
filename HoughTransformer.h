@@ -18,10 +18,10 @@
 
 struct HoughTransformer {
 
-	constexpr static int nPlanes=6;
+	constexpr static int nPlanes=6; //todo: make dynamic
 
-	HoughTransformer(double xmax, double ymax, int xbins, int ybins) :
-		xmax(xmax), ymax(ymax), xbins(xbins), ybins(ybins) {};
+	HoughTransformer( double xmin, double xmax, double ymin, double ymax, int xbins, int ybins ) :
+		xmin(xmin), xmax(xmax), ymin(ymin), ymax(ymax), xbins(xbins), ybins(ybins) {};
 
 	virtual ~HoughTransformer() {};
 
@@ -67,11 +67,15 @@ struct HoughTransformer {
 	template<class T >
 	static void drawCluster(const T& cluster, const DetectorConfiguration& detector);
 
-	double xmax, ymax;
+	double xmin, xmax, ymin, ymax;
 	int xbins, ybins;
 
+	int minClusterSize=5, minCandidateSize=3;
+	double angleOfTracksX=0., angleOfTracksY=0.;
 	
-	virtual std::list<HitCluster> operator() ( const std::vector< std::vector<PositionHit> >& hv, int minClusterSize=5, int minCandidateSize=3  ) {
+
+	//telescope
+	virtual std::list<HitCluster> operator() ( const std::vector< std::vector<PositionHit> >& hv  ) {
 
 		//construct grid
 		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( xbins );
@@ -80,8 +84,8 @@ struct HoughTransformer {
 //		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
 		for( int plane=0; plane<nPlanes; plane++ ) {
 			for(auto& h : hv[plane] ) {
-				int binx= h.x/xmax*xbins;
-				int biny= h.y/ymax*ybins;
+				int binx= (h.x-xmin-angleOfTracksX*h.z)/(xmax-xmin)*xbins;
+				int biny= (h.y-angleOfTracksY*h.z)/ymax*ybins;
 				if( binx>=xbins ) binx=xbins-1;
 				if( biny>=ybins ) biny=ybins-1;
 				if( binx<0 ) binx=0;
@@ -140,6 +144,86 @@ struct HoughTransformer {
 		return foundClusters;
 	}
 	
+
+	//timepix
+	std::list<HoughTransformer::HitCluster> operator() ( const std::vector<PositionHit>& hv ) {
+
+		//construct grid
+		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( xbins ); //Houghgrid[z][y]
+		for(auto& v : houghGrid) v.resize(ybins);
+
+		constexpr bool DrawHistogram=false;
+		static TCanvas* canv=nullptr;
+		if(canv) canv->Clear();
+		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
+		for(auto& h : hv ) {
+			int binx= (h.x-xmin-angleOfTracksX*h.z)/(xmax-xmin)*xbins;
+			int biny= (h.y-angleOfTracksY*h.z)/ymax*ybins;
+			if( binx>=xbins ) binx=xbins-1;
+			if( biny>=ybins ) biny=ybins-1;
+			if( binx<0 ) binx=0;
+			if( biny<0 ) biny=0;
+
+			if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>( new HitCluster() );
+			houghGrid.at(binx).at(biny)->add(h);
+
+			if(DrawHistogram) graphicHistogram.Fill(binx,biny);
+		}
+
+		//draw histogram
+		if(DrawHistogram) {
+			std::cout<<"drawing histogram of hough transform!"<<std::endl;
+			if(!canv) canv=new TCanvas("houghCanv", "Canvas with cluster histogram", 600,400);
+			canv->cd();
+			graphicHistogram.Draw("colz");
+			gPad->Update();
+	//		if(std::cin.get()=='q') {
+	//			throw graphicHistogram; //abuse of throw mechanism
+	//		}
+		}
+
+		//get grid positions and sort by size
+		std::list< std::tuple<int, int, int> > gridPositions;
+		for(int i=0; i<xbins; i++) {
+			for(int j=0; j<ybins; j++) {
+				if(houghGrid.at(i).at(j)) {
+					int size=houghGrid.at(i).at(j)->clusterSize;
+					if(size >= minCandidateSize) {
+						gridPositions.emplace_back(size, i, j);
+					}
+				}
+			}
+		}
+		gridPositions.sort();
+
+		//merge neighbouring bins, starting with largest
+		std::list<HitCluster> foundClusters;
+		for(auto it=gridPositions.rbegin();	it!=gridPositions.rend(); it++) {
+			int size, i, j;
+			std::tie(size,i,j)=*it;
+
+			if(!houghGrid.at(i).at(j)) continue;
+			auto& currentCluster= *houghGrid.at(i).at(j);
+			if(!currentCluster.clusterSize) continue;
+
+			for(int dx=-1; dx<=1; dx++) for(int dy=-1; dy<=1; dy++) {
+				if(i+dx<0 or i+dx >= xbins or j+dy<0 or j+dy >= ybins or (!dx and !dy) ) continue; //outside grid
+				if(! houghGrid.at(i+dx).at(j+dy) ) continue; //no hits in bin
+				currentCluster.mergeWith( *houghGrid.at(i+dx).at(j+dy) );
+			}
+
+			if(currentCluster.clusterSize >= minClusterSize) {
+				foundClusters.push_back( std::move(currentCluster) );
+			}
+			houghGrid.at(i).at(j).reset(nullptr);
+		}
+
+		return foundClusters;
+	}
+
+
+
+
 };
 
 template<class T > //=std::list<HitCluster>
@@ -194,88 +278,11 @@ struct TimePixHoughTransformer {
 
 	using HitCluster=HoughTransformer::HitCluster;
 
-	TimePixHoughTransformer( double xmin, double xmax, double ymax, int xbins, int ybins ) :
-		xmin(xmin), xmax(xmax), ymax(ymax), xbins(xbins), ybins(ybins) {};
 	double xmin,xmax, ymax;
 	int xbins, ybins;
 
-	int minClusterSize=30, minCandidateSize=20;
 
 
-	//angles in x and y plane
-	std::list<HoughTransformer::HitCluster> operator() ( const std::vector<PositionHit>& hv, double angleOfTracksX=0., double angleOfTracksY=0.  ) {
-
-		//construct grid
-		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( xbins ); //Houghgrid[z][y]
-		for(auto& v : houghGrid) v.resize(ybins);
-
-
-		static TCanvas* canv=nullptr;
-		if(canv) canv->Clear();
-		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
-		for(auto& h : hv ) {
-			int binx= (h.x-xmin-angleOfTracksX*h.z)/(xmax-xmin)*xbins;
-			int biny= (h.y-angleOfTracksY*h.z)/ymax*ybins;
-			if( binx>=xbins ) binx=xbins-1;
-			if( biny>=ybins ) biny=ybins-1;
-			if( binx<0 ) binx=0;
-			if( biny<0 ) biny=0;
-
-			if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>( new HitCluster() );
-			houghGrid.at(binx).at(biny)->add(h);
-
-			graphicHistogram.Fill(binx,biny);
-		}
-
-		//draw histogram
-		std::cout<<"drawing histogram of hough transform!"<<std::endl;
-		if(!canv) canv=new TCanvas("houghCanv", "Canvas with cluster histogram", 600,400);
-		canv->cd();
-
-		graphicHistogram.Draw("colz");
-		gPad->Update();
-//		if(std::cin.get()=='q') {
-//			throw graphicHistogram; //abuse of throw mechanism
-//		}
-
-		//get grid positions and sort by size
-		std::list< std::tuple<int, int, int> > gridPositions;
-		for(int i=0; i<xbins; i++) {
-			for(int j=0; j<ybins; j++) {
-				if(houghGrid.at(i).at(j)) {
-					int size=houghGrid.at(i).at(j)->clusterSize;
-					if(size >= minCandidateSize) {
-						gridPositions.emplace_back(size, i, j);
-					}
-				}
-			}
-		}
-		gridPositions.sort();
-
-		//merge neighbouring bins, starting with largest
-		std::list<HitCluster> foundClusters;
-		for(auto it=gridPositions.rbegin();	it!=gridPositions.rend(); it++) {
-			int size, i, j;
-			std::tie(size,i,j)=*it;
-
-			if(!houghGrid.at(i).at(j)) continue;
-			auto& currentCluster= *houghGrid.at(i).at(j);
-			if(!currentCluster.clusterSize) continue;
-
-			for(int dx=-1; dx<=1; dx++) for(int dy=-1; dy<=1; dy++) {
-				if(i+dx<0 or i+dx >= xbins or j+dy<0 or j+dy >= ybins or (!dx and !dy) ) continue; //outside grid
-				if(! houghGrid.at(i+dx).at(j+dy) ) continue; //no hits in bin
-				currentCluster.mergeWith( *houghGrid.at(i+dx).at(j+dy) );
-			}
-
-			if(currentCluster.clusterSize >= minClusterSize) {
-				foundClusters.push_back( std::move(currentCluster) );
-			}
-			houghGrid.at(i).at(j).reset(nullptr);
-		}
-
-		return foundClusters;
-	}
 
 
 };

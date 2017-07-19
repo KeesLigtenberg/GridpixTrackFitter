@@ -22,7 +22,11 @@ public:
 	virtual ~ResidualHistogrammer();
 
 	void fill(const Residual&, const std::pair<double, double>& rotationPoint);
-	void fill(const std::vector<Residual>&, const std::vector<std::pair<double, double> >& rotationPoints);
+	void fill(const std::vector<Residual>&, const std::vector<std::pair<double, double> >& rotationPoints );
+	void fill(const std::vector<Residual>& residualVector) {
+		std::vector< std::pair<double,double> > rotationPoints(detector.nPlanes, detector.getCentre());
+		fill(residualVector, rotationPoints );
+	}
 
 
 	std::vector< std::pair<double, double> > getMeansOfPlanes();
@@ -33,22 +37,23 @@ public:
 
 	struct PlaneHistograms {
 		static int n;
-		PlaneHistograms() :
+		PlaneHistograms(const DetectorConfiguration& det) :
 			xResidual( ("xResidual_"+std::to_string(n)).c_str(), ("xResidual_"+std::to_string(n)).c_str(), 40, -0.4, 0.4),
 			yResidual( ("yResidual_"+std::to_string(n)).c_str(), ("yResidual_"+std::to_string(n)).c_str(), 40, -0.4, 0.4),
 			zRotation( ("zRotation_"+std::to_string(n)).c_str(), ("zRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
-			xResidualByPixel( ("xResidualByPixel_"+std::to_string(n)).c_str(), ("xResidualByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 ),
-			yResidualByPixel( ("yResidualByPixel_"+std::to_string(n)).c_str(), ("yResidualByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 ),
+			xResidualByPixel( ("xResidualByPixel_"+std::to_string(n)).c_str(), ("xResidualByPixel_"+std::to_string(n)).c_str(), 20, det.xmin(), det.xmax(), 20, 0, det.ymax() ),
+			yResidualByPixel( ("yResidualByPixel_"+std::to_string(n)).c_str(), ("yResidualByPixel_"+std::to_string(n)).c_str(), 20, det.xmin(), det.xmax(), 20, 0, det.ymax() ),
 //			xRotation( ("xRotation_"+std::to_string(n)).c_str(), ("xRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
 //			yRotation( ("yRotation_"+std::to_string(n)).c_str(), ("yRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
-			zRotationByPixel( ("zRotationByPixel_"+std::to_string(n)).c_str(), ("zRotationByPixel_"+std::to_string(n)).c_str(), 20, 0, 1153*0.0184, 20, 0, 577*0.0184 )
+			zRotationByPixel( ("zRotationByPixel_"+std::to_string(n)).c_str(), ("zRotationByPixel_"+std::to_string(n)).c_str(), 20, det.xmin(), det.xmax(), 20, 0, det.ymax() )
 		{ ++n; }
 		std::pair<double,double> getMeansFromFit();
 		double getRotationFromFit();
 		TH1D xResidual, yResidual;
 		TH1D zRotation;// xRotation, yRotation;
 		TProfile2D xResidualByPixel, yResidualByPixel, zRotationByPixel;
-	} planeHist[6];
+	};
+	std::vector<PlaneHistograms> planeHist;
 
 };
 
@@ -56,8 +61,9 @@ public:
 class TrackHistogrammer {
 public:
 	TrackHistogrammer(const DetectorConfiguration& detector);
-	void fill(TrackFitResult entry);
+	void fill(SimpleFitResult entry);
 private:
+	TH1D slope1, slope2, intercept1, intercept2;
 	TH1D phi, d0, tanLambda, z0;
 	const DetectorConfiguration& detector;
 };

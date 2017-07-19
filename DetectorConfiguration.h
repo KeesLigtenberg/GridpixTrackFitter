@@ -8,6 +8,8 @@
 #ifndef DETECTORCONFIGURATION_H_
 #define DETECTORCONFIGURATION_H_
 
+#include <utility>
+
 struct DetectorConfiguration {
 	virtual ~DetectorConfiguration() {}
 	DetectorConfiguration (int nPlanes, std::vector<double> planePosition, double pixelsize, int pixelColumns, int pixelRows) :
@@ -30,6 +32,10 @@ struct DetectorConfiguration {
 	virtual double xmin() const { return 0.; };
 	virtual double ymax() const { return planeymax(); };
 	virtual double ymin() const { return 0.; };
+	virtual double zmax() const { return planePosition.back(); };
+	virtual double zmin() const { return planePosition.front(); };
+
+	virtual std::pair<double,double> getCentre() const { return { (xmax()-xmin())/2, (ymax()-ymin())/2 }; };
 
 };
 

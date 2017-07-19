@@ -16,8 +16,11 @@ int ResidualHistogrammer::PlaneHistograms::n=0;
 
 ResidualHistogrammer::ResidualHistogrammer(std::string outputFileName, const DetectorConfiguration& detector) :
 		outputFile(outputFileName.c_str(), "RECREATE"),
-		detector(detector)
+		detector(detector),
+		planeHist()
 {
+	planeHist.reserve(detector.nPlanes);
+	for(int i=0; i<detector.nPlanes; ++i) planeHist.emplace_back( detector );
 	ResidualHistogrammer::PlaneHistograms::n=0;
 }
 
@@ -109,12 +112,22 @@ TrackHistogrammer::TrackHistogrammer(const DetectorConfiguration& detector) :
 	d0("trackd0", "track d_{0}; d_{0} [mm]; tracks", 20, 0, detector.planexmax() ),
 	tanLambda("trackTanLambda", "track tan(#lambda); tan(#lambda); tracks", 20,-0.01,0.01),
 	z0("trackz0", "track z_{0}; z_{0} [mm]; tracks", 20, 0, detector.planeymax() ),
+	slope1("slope1", "slope 1 (X); slope; tracks", 20, -1, 1),
+	slope2("slope2", "slope 2 (Y); slope; tracks", 20, -1, 1),
+	intercept1("intercept1", "intercept 1 (X); intercept; tracks", 20, -0.01, 0.01),
+	intercept2("intercept2", "intercept 2 (Y); intercept; tracks", 20, -0.01, 0.01),
 	detector(detector)
 		{};
 
-void TrackHistogrammer::fill(TrackFitResult entry) {
+void TrackHistogrammer::fill(SimpleFitResult fit) {
+	TrackFitResult entry(fit);
 	phi.Fill(entry.phi);
 	d0.Fill(entry.d0);
 	tanLambda.Fill(entry.tanlambda);
 	z0.Fill(entry.z0);
+
+	slope1.Fill(fit.slope1);
+	slope2.Fill(fit.slope2);
+	intercept1.Fill(fit.intersept1);
+	intercept2.Fill(fit.intersept2);
 }

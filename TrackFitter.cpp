@@ -21,11 +21,12 @@ using namespace std;
 
 trackFitter::trackFitter(std::string inputfile, const DetectorConfiguration& detector) :
 	detector(detector),
-	houghTransform(detector.planexmax(), detector.planeymax(), 30/*xbins*/, 15 /*ybins*/ ),
+	houghTransform(detector.xmin(), detector.xmax(), detector.ymin(), detector.ymax(), 30/*xbins*/, 15 /*ybins*/ ),
 	residualHistograms(nullptr),
-	hitsCentreOfMass(detector.nPlanes, {detector.planexmax()/2, detector.planeymax()/2} ), //initialise to regular centre of sensor
+	hitsCentre(detector.nPlanes, detector.getCentre() ), //initialise to regular centre of sensor
 	averageResidualFromSum(detector.nPlanes, {0,0} ), //initialise to zero
-	rotationZFromSum(detector.nPlanes)
+	rotationZFromSum(detector.nPlanes),
+	slope1FromSum(0), slope2FromSum(0)
 {
 
 	//get tree from file
@@ -42,7 +43,7 @@ trackFitter::trackFitter(std::string inputfile, const DetectorConfiguration& det
 
 trackFitter::~trackFitter() {
 	file->Close();
-	residualHistograms=nullptr; //make sure to close residualHistograms before track
+	residualHistograms=nullptr; //make sure to close residualHistograms before track, because they use the same file
 	trackHistograms=nullptr; //todo: combine both in a proper way;
 }
 
@@ -68,6 +69,42 @@ bool trackFitter::passEvent(std::vector<std::vector<PositionHit> > spaceHit) {
 	return nPlanesHit>nMinPlanesHit;
 }
 
+std::vector<std::vector<PositionHit> > trackFitter::getSpaceHits() {
+	std::vector<std::vector<PositionHit> > spaceHit;
+	//apply mask
+	if (!mask.empty()) {
+		auto itmask = mask.begin();
+		for (unsigned plane = 0; plane < mimosaHit->size(); plane++) {
+			auto maskedHit = applyPixelMask(*itmask++, mimosaHit->at(plane));
+			//convert hits to positions
+			spaceHit.push_back(
+					convertHits(maskedHit, detector.planePosition[plane],
+							detector.pixelsize, detector.pixelsize, plane));
+		}
+	}
+	return spaceHit;
+}
+
+std::vector<std::vector<PositionHit> >&  trackFitter::rotateAndShift(
+		std::vector<std::vector<PositionHit> >& spaceHit) {
+	//apply translation and rotation
+	if (!shifts.empty())
+		spaceHit = translateHits(spaceHit, shifts);
+	if (!angles.empty())
+		spaceHit = rotateHits(spaceHit, angles, hitsCentre);
+
+}
+
+int trackFitter::getEntry(int iEvent) {
+	//get entry
+	int nb=hitTable->GetEntry(iEvent);
+	if (!mimosaHit) {
+		cout << "Did not find mimosaHit!" << endl;
+		return false;
+	}
+	return nb;
+}
+
 void trackFitter::fitTracks(std::string outputfilename) {
 	residualHistograms=unique_ptr<ResidualHistogrammer>(new ResidualHistogrammer(outputfilename, detector));
 	if(makeTrackHistograms) trackHistograms=unique_ptr<TrackHistogrammer>(new TrackHistogrammer(detector) );
@@ -77,62 +114,39 @@ void trackFitter::fitTracks(std::string outputfilename) {
 	std::vector<double>	residualXSum(detector.nPlanes), residualYSum(detector.nPlanes);
 	std::vector<double> rotationZSum(detector.nPlanes), rotationZWeightSum(detector.nPlanes);
 	std::vector<int> nHits(detector.nPlanes);
+	double slope1Sum=0, slope2Sum=0;
 
 	//loop over all entries
 	const long long nEvents=hitTable->GetEntriesFast(); //std::min( (long long) 2,);
 	long int nPassed=0,nClusters=0;
 	for( int iEvent=0; iEvent<nEvents; iEvent++ ) {
 
-		if(!(iEvent%10000))
+		if(!(iEvent%100000))
 			std::cout<<"event "<<iEvent<<"/"<<nEvents<<std::endl;
 
 		//get entry
-		hitTable->GetEntry(iEvent);
+		if(!getEntry(iEvent) ) continue;
 
-		if(!mimosaHit) {
-			cout<<"Did not find mimosaHit!"<<endl;
-			continue;
-		}
+		//apply mask and convert
+		std::vector<std::vector<PositionHit> > spaceHit = getSpaceHits();
 
-		std::vector<std::vector<PositionHit> > spaceHit;
-
-		//apply mask
-		if(!mask.empty()) {
-			auto itmask=mask.begin();
-			for(unsigned plane=0; plane<mimosaHit->size(); plane++ ) {
-				auto maskedHit = applyPixelMask( *itmask++ , mimosaHit->at(plane) ) ;
-				//convert hits to positions
-				spaceHit.push_back( convertHits(maskedHit, detector.planePosition[plane], detector.pixelsize, detector.pixelsize, plane) );
-			}
-		}
-
+		//check event
 		if( !passEvent(spaceHit) ) continue;
 		++nPassed;
 
 		//sum x and y here to sum all hits including noise
 
 		//apply translation and rotation
-		const auto& rotationPoints=hitsCentreOfMass;
-		if(!shifts.empty()) spaceHit=translateHits(spaceHit,shifts);
-		if(!angles.empty()) spaceHit=rotateHits(spaceHit, angles, rotationPoints);
-
+		spaceHit=rotateAndShift(spaceHit);
 		//hough transform
 		auto houghClusters = houghTransform(spaceHit);
 
-		//require at least 5/6 planes to be hit
+		//require at least nmin planes to be hit
 		const int nMinPlanesHit=4;
 		houghClusters.remove_if([](const HoughTransformer::HitCluster& hc){return hc.getNPlanesHit()<nMinPlanesHit; });
 		if(!houghClusters.size()) {
 			continue;
 		}
-
-//		std::cout<<"found "<<houghClusters.size()<<" clusters of size ";
-//		for(auto& cl : houghClusters) {
-//			std::cout<<cl.clusterSize<<", ";
-//		}
-//		std::cout<<std::endl;
-//		HoughTransformer::drawClusters(houghClusters, mimosa);
-
 
 		//first fit on outer planes and translate inner hits
 		std::vector<SimpleFitResult> fits;
@@ -165,7 +179,8 @@ void trackFitter::fitTracks(std::string outputfilename) {
 			}
 
 			residuals=calculateResiduals(hitCluster, fit);
-			residualHistograms->fill(residuals, rotationPoints);
+
+			residualHistograms->fill(residuals, hitsCentre);
 
 			//sum residuals
 			if(residuals.size()) for(auto& r : residuals) {
@@ -173,13 +188,16 @@ void trackFitter::fitTracks(std::string outputfilename) {
 				residualXSum[r.h.plane]+=r.x;
 				residualYSum[r.h.plane]+=r.y;
 
-				auto& rotationPoint=rotationPoints[r.h.plane];
+				auto& rotationPoint=hitsCentre[r.h.plane];
 				double xc=rotationPoint.first, yc=rotationPoint.second; //x and y center
 				double hx=r.h.x-xc, hy=r.h.y-yc;
 				double phi=(hy*r.x-hx*r.y)/(hx*hx+hy*hy);
 				double weight=hx*hx+hy*hy;
 				rotationZSum[r.h.plane]+=phi*weight; rotationZWeightSum[r.h.plane]+=weight;
 			}
+
+			//sum fit slope
+			slope1Sum+=fit.slope1; slope2Sum+=fit.slope2;
 
 			fits.push_back(fit);
 			if(makeTrackHistograms) { trackHistograms->fill(fit); }
@@ -219,8 +237,8 @@ void trackFitter::fitTracks(std::string outputfilename) {
 	if(recalculateCOM) {
 		cout<<"centre of chip is "<<detector.planexmax()/2<<", "<<detector.planeymax()/2<<endl;
 		for(int i=0; i<detector.nPlanes; ++i) {
-			hitsCentreOfMass[i]={ hitsXSum[i]/nHits[i], hitsYSum[i]/nHits[i] };
-			cout<<"Hits centre of mass is: ("<<hitsCentreOfMass[i].first<<", "<<hitsCentreOfMass[i].second<<")"<<endl;
+			hitsCentre[i]={ hitsXSum[i]/nHits[i], hitsYSum[i]/nHits[i] };
+			cout<<"Hits centre of mass is: ("<<hitsCentre[i].first<<", "<<hitsCentre[i].second<<")"<<endl;
 		}
 		recalculateCOM=false;
 	}
@@ -230,6 +248,11 @@ void trackFitter::fitTracks(std::string outputfilename) {
 		averageResidualFromSum[i]= { residualXSum[i]/nHits[i], residualYSum[i]/nHits[i] };
 		rotationZFromSum[i]= rotationZSum[i]/rotationZWeightSum[i];
 	}
+
+	slope1FromSum=slope1Sum/nClusters;
+	slope2FromSum=slope2Sum/nClusters;
+	cout<<"slopes are "<<slope1FromSum<<" "<<slope2FromSum<<endl;
+
 //	cin.get();
 
 }
@@ -284,4 +307,13 @@ const std::vector<std::pair<double, double> >& trackFitter::getShifts() const {
 
 const std::vector<double>& trackFitter::getAngles() const {
 	return angles;
+}
+
+std::pair<double, double> trackFitter::getSlopes() const {
+	return {slope1FromSum, slope2FromSum};
+}
+
+void trackFitter::setSlopes(std::pair<double, double> slopes) {
+	houghTransform.angleOfTracksX=slopes.first;
+	houghTransform.angleOfTracksY=slopes.second;
 }
