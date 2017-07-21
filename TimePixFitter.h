@@ -42,14 +42,19 @@ public:
 	void setSlopes( std::pair<double, double> slopes);
 	int getEntry(int iEvent);
 
+	void drawEvent(const std::vector<PositionHit>& spaceHit,
+			const std::vector<SimpleFitResult>& fits);
+
 	bool displayEvent=false;
 	bool makeTrackHistograms=false;
 	bool recalculateCOM=true; //centre of mass
 	bool constructLineParallelToZ=false;
 
-	double maxResidual=0.2;
+	double maxResidual=10;
 
 	std::function<bool(const PositionHit&)> selectHitForRefit = [](const PositionHit&){return true;}; //select all rawHits by default
+
+	HoughTransformer houghTransform;
 
 protected:
 	std::vector<PositionHit> getSpaceHits();
@@ -59,10 +64,10 @@ protected:
 private:
 	TFile* file;
 	TTree* hitTable;
+	long long nEvents=0;
 	const std::vector<TimePixHit>* rawHits=nullptr;
 
 	const DetectorConfiguration& detector;
-	HoughTransformer houghTransform;
 	std::unique_ptr<ResidualHistogrammer> residualHistograms;
 	std::unique_ptr<TrackHistogrammer> trackHistograms;
 
@@ -76,7 +81,8 @@ private:
 
 	double slope1FromSum, slope2FromSum;
 
-
+//friend function!
+	friend void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset);
 };
 
 #endif /* TimePixFitter_H_ */

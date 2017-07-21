@@ -17,6 +17,7 @@ inline PositionHit& translateHit(PositionHit& h, double dx, double dy ) {
 }
 inline PositionHit& translateHit(PositionHit& h, const std::pair<double,double>& translation) { return translateHit(h,translation.first, translation.second); }
 
+//rotate around line parellel to z-axis
 inline PositionHit& rotateHit(PositionHit& h, double rotation, const std::pair<double, double>& rotationPoint) {
 	double sinr=sin(rotation), cosr=cos(rotation);
 
@@ -56,9 +57,9 @@ hitCollection& rotateHits(hitCollection& hits, const std::vector<double>& rotati
 }
 
 template<class hitCollection>
-hitCollection& rotateHits(hitCollection& hits, double rotations, const std::pair<double, double>& rotationPoints ) {
+hitCollection& rotateHits(hitCollection& hits, double rotation, const std::pair<double, double>& rotationPoints ) {
 	for(PositionHit& h : hits) {
-		h=rotateHit(h,rotations, rotationPoints);
+		h=rotateHit(h,rotation, rotationPoints);
 	}
 	return hits;
 }

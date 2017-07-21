@@ -17,6 +17,7 @@
 #include "HoughTransformer.h"
 #include "PositionHit.h"
 #include "makeNoisyPixelMask.h"
+#include "linearRegressionFit.h"
 
 class ResidualHistogrammer;
 class TrackHistogrammer;
@@ -42,6 +43,11 @@ public:
 	void setSlopes( std::pair<double, double> slopes);
 	int getEntry(int iEvent);
 
+	void saveAlignment(std::string outputfile);
+	void drawEvent(const std::vector<std::vector<PositionHit> >& spaceHit,
+			const std::vector<SimpleFitResult>& fits);
+	static bool processDrawSignals();
+
 	bool displayEvent=false;
 	bool makeTrackHistograms=false;
 	bool recalculateCOM=true; //centre of mass
@@ -59,7 +65,9 @@ protected:
 private:
 	TFile* file;
 	TTree* hitTable;
+	long long nEvents=0;
 	const std::vector<std::vector<Hit>>* mimosaHit=nullptr;
+	unsigned short triggerNumberBegin=0, triggerNumberEnd=0;
 
 	const DetectorConfiguration& detector;
 	HoughTransformer houghTransform;
@@ -76,7 +84,8 @@ private:
 
 	double slope1FromSum, slope2FromSum;
 
-
+//friend function!
+	friend void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset);
 };
 
 #endif /* TRACKFITTER_H_ */

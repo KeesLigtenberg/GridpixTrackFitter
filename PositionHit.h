@@ -2,12 +2,15 @@
 #define POSITIONHIT_H
 
 #include "Hit.h"
+#include "TVector3.h"
 
 struct PositionHit {
 	PositionHit(double x, double y, double z, int plane=0, int ToT=1) : x(x), y(y), z(z), plane(plane), ToT(ToT) {};
 	double x,y,z;
 	int plane;
 	int ToT=1;
+	TVector3 getPosition() const { return {x,y,z}; };
+	void SetPosition(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };
 };
 
 inline std::vector<PositionHit> convertHits(const std::vector<Hit>& hv, double planePosition, double pixelwidth, double pixelheight, int plane=0) {

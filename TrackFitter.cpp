@@ -4,8 +4,9 @@
  *  Created on: Jun 22, 2017
  *      Author: cligtenb
  */
-
 #include "TrackFitter.h"
+
+#include <fstream>
 
 #include "TSystem.h"
 #include "TView.h"
@@ -35,9 +36,10 @@ trackFitter::trackFitter(std::string inputfile, const DetectorConfiguration& det
 
 	//setup tree for reading
 	hitTable->SetBranchAddress("mimosa", &mimosaHit);
+	nEvents=hitTable->GetEntriesFast();
 	//    unsigned short triggerNumberBegin, triggerNumberEnd;
-//	hitTable->SetBranchAddress("triggerNumberBegin", &triggerNumberBegin);
-//	hitTable->SetBranchAddress("triggerNumberEnd", &triggerNumberEnd);
+	hitTable->SetBranchAddress("triggerNumberBegin", &triggerNumberBegin);
+	hitTable->SetBranchAddress("triggerNumberEnd", &triggerNumberEnd);
 
 }
 
@@ -65,6 +67,7 @@ bool trackFitter::passEvent(const std::vector<std::vector<PositionHit> >& spaceH
 			nTotalHits+=size;
 		}
 	}
+//	cout<<nPlanesHit<<" planes hit \n";
 	const int nMinPlanesHit=3;//require at least 4 planes hit
 	return nPlanesHit>nMinPlanesHit;
 }
@@ -92,10 +95,11 @@ std::vector<std::vector<PositionHit> >&  trackFitter::rotateAndShift(
 		spaceHit = translateHits(spaceHit, shifts);
 	if (!angles.empty())
 		spaceHit = rotateHits(spaceHit, angles, hitsCentre);
-
+	return spaceHit;
 }
 
 int trackFitter::getEntry(int iEvent) {
+	if(iEvent>=nEvents) return false;
 	//get entry
 	int nb=hitTable->GetEntry(iEvent);
 	if (!mimosaHit) {
@@ -103,6 +107,18 @@ int trackFitter::getEntry(int iEvent) {
 		return false;
 	}
 	return nb;
+}
+
+//returns true if stopped
+void trackFitter::drawEvent(
+		const std::vector<std::vector<PositionHit> >& spaceHit,
+		const std::vector<SimpleFitResult>& fits) {
+	HoughTransformer::drawClusters(spaceHit, detector);
+	//			HoughTransformer::drawClusters(houghClusters, detector);
+
+	for (auto& f : fits)
+		f.draw( detector.zmin(), detector.zmax() );
+	gPad->Update();
 }
 
 void trackFitter::fitTracks(std::string outputfilename) {
@@ -117,7 +133,6 @@ void trackFitter::fitTracks(std::string outputfilename) {
 	double slope1Sum=0, slope2Sum=0;
 
 	//loop over all entries
-	const long long nEvents=hitTable->GetEntriesFast(); //std::min( (long long) 2,);
 	long int nPassed=0,nClusters=0;
 	for( int iEvent=0; iEvent<nEvents; iEvent++ ) {
 
@@ -152,11 +167,10 @@ void trackFitter::fitTracks(std::string outputfilename) {
 		std::vector<SimpleFitResult> fits;
 		for(auto& hitCluster : houghClusters) {
 
-			if(hitCluster.size()<2 || hitCluster.getNPlanesHit()<=1) continue;
-
 			//fit track
+			if(hitCluster.size()<2 || hitCluster.getNPlanesHit()<=1) continue;
 			auto fit=linearRegressionFit(hitCluster);
-			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
+			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl;  continue;	}
 
 			//remove outliers
 			auto residuals=calculateResiduals(hitCluster, fit);
@@ -169,7 +183,7 @@ void trackFitter::fitTracks(std::string outputfilename) {
 			if(constructLineParallelToZ) fit = SimpleFitResult{0,selectedHits.front().x, 0, selectedHits.front().y, 0,0,0,0};
 			else fit=linearRegressionFit(selectedHits);
 
-			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
+			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; continue;	}
 
 			//sum x and y for calculation of centre of mass from track hits
 			if(hitCluster.size()) for(auto& h : hitCluster) {
@@ -206,27 +220,8 @@ void trackFitter::fitTracks(std::string outputfilename) {
 		}
 
 		if(displayEvent) {
-			HoughTransformer::drawClusters(spaceHit, detector);
-//			HoughTransformer::drawClusters(houghClusters, detector);
-			for(auto& f : fits) f.draw(0, detector.planePosition.back());
-			gPad->Update();
-			auto signal=std::cin.get();
-			if(signal=='q') break;
-			else if(signal=='l') {
-				while(!gSystem->ProcessEvents()) {
-				   gSystem->Sleep(50);
-				}
-				break;
-			} else if(signal=='w') {
-				//rotate and write as animated gif!
-				double phiView=40;
-				for(int thetaView=0; thetaView<360; thetaView+=2 ) {
-				   gPad->GetView()->RotateView(thetaView,phiView);
-				   gPad->Modified();
-				   gPad->Update();
-				   gPad->Print( thetaView==358 ? "eventAnimation.gif++5++" : "eventAnimation.gif+5");
-				}
-			}
+			drawEvent(spaceHit, fits) ;
+			if( processDrawSignals() ) break; //returns true if stopped
 		}
 
 	}
@@ -317,3 +312,48 @@ void trackFitter::setSlopes(std::pair<double, double> slopes) {
 	houghTransform.angleOfTracksX=slopes.first;
 	houghTransform.angleOfTracksY=slopes.second;
 }
+
+void trackFitter::saveAlignment(std::string outputfile) {
+	ofstream fout(outputfile);
+
+	fout<<  "//this file contains the alignment parameters in c format\n"
+			"//include the file to load the parameters\n\n";
+
+	fout<<"std::vector<std::pair<double,double>> savedShifts={ ";
+	for(auto s=shifts.begin(); s!=shifts.end();) {
+		fout<<"{"<<s->first<<", "<<s->second;
+		fout<< ( ++s==shifts.end() ? "} };\n" : "}, " );
+	}
+	fout<<"std::vector<double> savedAngles={ ";
+	for(auto r=angles.begin(); r!=angles.end();) {
+		fout<< (*r) ;
+		fout<< ( ++r==angles.end() ? " };\n" : ", " );
+	}
+	fout<<"std::pair<double,double> savedSlopes= {"<<houghTransform.angleOfTracksX<<", "<<houghTransform.angleOfTracksY<<"};"<<endl;
+	fout<<endl;
+}
+
+bool trackFitter::processDrawSignals() {
+	auto signal = std::cin.get();
+	if (signal == 'q')
+		return true;
+	else if (signal == 'l') {
+		while (!gSystem->ProcessEvents()) {
+			gSystem->Sleep(50);
+		}
+		return true;
+	} else if (signal == 'w') {
+		//rotate and write as animated gif!
+		double phiView = 40;
+		for (int thetaView = 0; thetaView < 360; thetaView += 2) {
+			gPad->GetView()->RotateView(thetaView, phiView);
+			gPad->Modified();
+			gPad->Update();
+			gPad->Print(
+					thetaView == 358 ?
+							"eventAnimation.gif++5++" : "eventAnimation.gif+5");
+		}
+	}
+	return false;
+}
+

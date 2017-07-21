@@ -16,12 +16,13 @@
 #include "makeNoisyPixelMask.h"
 #include "transformHits.h"
 #include "ResidualHistogrammer.h"
+#include "TrackFitter.h"
 
 using namespace std;
 
 TimePixFitter::TimePixFitter(std::string inputfile, const DetectorConfiguration& detector) :
 	detector(detector),
-	houghTransform(detector.xmin(), detector.xmax(), detector.ymin(), detector.ymax(), 30/*xbins*/, 15 /*ybins*/ ),
+	houghTransform(detector.xmin(), detector.xmax(), detector.ymin(), detector.ymax(), 12/*xbins*/, 12 /*ybins*/ ),
 	residualHistograms(nullptr),
 	hitsCentre(detector.getCentre() ), //initialise to regular centre of sensor
 	averageResidualFromSum{0,0}, //initialise to zero
@@ -36,6 +37,7 @@ TimePixFitter::TimePixFitter(std::string inputfile, const DetectorConfiguration&
 
 	//setup tree for reading
 	hitTable->SetBranchAddress("timepix", &rawHits);
+	nEvents=hitTable->GetEntriesFast();
 	//    unsigned short triggerNumberBegin, triggerNumberEnd;
 //	hitTable->SetBranchAddress("triggerNumberBegin", &triggerNumberBegin);
 //	hitTable->SetBranchAddress("triggerNumberEnd", &triggerNumberEnd);
@@ -65,7 +67,7 @@ std::vector<PositionHit> TimePixFitter::getSpaceHits() {
 	if (!mask.empty()) {
 		auto maskedHit = applyPixelMask(mask, *rawHits);
 		//convert rawHits to positions
-		const double driftScale=25./4096;
+		const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/;
 		spaceHit=convertHits( maskedHit, detector.pixelsize, detector.pixelsize, driftScale );
 	}
 	return spaceHit;
@@ -80,6 +82,7 @@ std::vector<PositionHit>&  TimePixFitter::rotateAndShift(
 }
 
 int TimePixFitter::getEntry(int iEvent) {
+	if(iEvent>=nEvents) return false;
 	//get entry
 	int nb=hitTable->GetEntry(iEvent);
 	if (!rawHits) {
@@ -87,6 +90,15 @@ int TimePixFitter::getEntry(int iEvent) {
 		return false;
 	}
 	return nb;
+}
+
+void TimePixFitter::drawEvent(const vector<PositionHit>& spaceHit,
+		const std::vector<SimpleFitResult>& fits) {
+	HoughTransformer::drawCluster(spaceHit, detector);
+	//			HoughTransformer::drawClusters(houghClusters, detector);
+	for (auto& f : fits)
+		f.draw(detector.zmin(), detector.zmax());
+	gPad->Update();
 }
 
 void TimePixFitter::fitTracks(std::string outputfilename) {
@@ -102,7 +114,6 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 	double slope1Sum=0, slope2Sum=0;
 
 	//loop over all entries
-	const long long nEvents=hitTable->GetEntriesFast(); //std::min( (long long) 2,);
 	long int nPassed=0,nClusters=0;
 	for( int iEvent=0; iEvent<nEvents; iEvent++ ) {
 
@@ -113,7 +124,7 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 		if(!getEntry(iEvent) ) continue;
 
 		//apply mask and convert
-		auto spaceHit = getSpaceHits();
+		vector<PositionHit> spaceHit = getSpaceHits();
 
 		//check event
 		if( !passEvent(spaceHit) ) continue;
@@ -191,27 +202,10 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 		}
 
 		if(displayEvent) {
-			HoughTransformer::drawCluster(spaceHit, detector);
-//			HoughTransformer::drawClusters(houghClusters, detector);
-			for(auto& f : fits) f.draw(0, detector.planePosition.back());
-			gPad->Update();
-			auto signal=std::cin.get();
-			if(signal=='q') break;
-			else if(signal=='l') {
-				while(!gSystem->ProcessEvents()) {
-				   gSystem->Sleep(50);
-				}
-				break;
-			} else if(signal=='w') {
-				//rotate and write as animated gif!
-				double phiView=40;
-				for(int thetaView=0; thetaView<360; thetaView+=2 ) {
-				   gPad->GetView()->RotateView(thetaView,phiView);
-				   gPad->Modified();
-				   gPad->Update();
-				   gPad->Print( thetaView==358 ? "eventAnimation.gif++5++" : "eventAnimation.gif+5");
-				}
-			}
+			static TCanvas* canv=new TCanvas("eventDisplay", "Display of event", 600,400);
+			canv->cd();
+			drawEvent(spaceHit, fits);
+			if( trackFitter::processDrawSignals()  ) break;
 		}
 
 	}

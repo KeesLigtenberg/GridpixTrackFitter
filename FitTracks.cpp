@@ -52,7 +52,7 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 
 	for(int i=0; i<nRepeatFit; i++) {
 				cout<<"fitting "<<i<<endl;
-				if(i==4) telescopeFitter.displayEvent=true;
+//				if(i==4) telescopeFitter.displayEvent=true;
 
 				if(i>=3) telescopeFitter.makeTrackHistograms=true;
 
@@ -100,6 +100,7 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 				}
 	}
 
+	telescopeFitter.saveAlignment("mimosaAlignment.h");
 
 	//create and combine graphs
 	std::vector<TGraph*> shiftxGraph,shiftyGraph, rotationGraph;

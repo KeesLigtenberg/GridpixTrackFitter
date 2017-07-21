@@ -14,7 +14,7 @@
 struct SimpleFitResult {
 	double slope1, intersept1, slope2, intersept2;
 	double dslope1, dintersept1, dslope2, dintersept2; //uncertainties
-	void draw(double zmin, double zmax) {
+	void draw(double zmin, double zmax) const {
 		const int npoints=2;
 		double x[npoints] = {slope1 * zmin + intersept1, slope1 * zmax + intersept1};
 		double y[npoints] = {slope2 * zmin + intersept2, slope2 * zmax + intersept2};
@@ -26,6 +26,11 @@ struct SimpleFitResult {
 		return !(std::isnan(slope1) || std::isnan(slope2) || std::isnan(intersept1) || std::isnan(intersept2) );
 	}
 };
+
+//root dictionary for use in TTree
+#pragma link C++ class SimpleFitResult+;
+#pragma link C++ class std::vector<SimpleFitResult>+;
+
 struct TrackFitResult {
 	TrackFitResult(const SimpleFitResult& fr) : //TODO: check! this was before y <-> z
 		phi(atan(1.)*2 - atan(fr.slope1)),
