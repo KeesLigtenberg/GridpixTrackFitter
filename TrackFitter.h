@@ -85,7 +85,7 @@ private:
 	double slope1FromSum, slope2FromSum;
 
 //friend function!
-	friend void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset);
+	friend void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent);
 };
 
 #endif /* TRACKFITTER_H_ */

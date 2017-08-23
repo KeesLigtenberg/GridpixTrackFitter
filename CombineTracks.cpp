@@ -46,7 +46,7 @@ const DetectorConfiguration mimosa= {
 };
 
 
-void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset=0) {
+void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent=false) {
 
 	//mimosa
 	trackFitter telescopeFitter(mimosaInput, mimosa);
@@ -80,18 +80,20 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset
 	fitResultTree.Branch("ntelescopeHits", &ntelescopeHits);
 
 	int nTelescopeTriggers=0,previousTriggerNumberBegin=0;
-	for(int i=0;
+	for(int i=0,j=0;
 //			i<20
 			;i++) {
 
 		if( !telescopeFitter.getEntry(i) ) break;
-		//x telescope == x-1 timepix so offset should be -1!
-		if(telescopeFitter.triggerNumberBegin+offset<0) continue;
-		if( !tpcFitter.getEntry(telescopeFitter.triggerNumberBegin+offset) ) break;
+
+		//get next entry until tpc trigger number is larger than begin
+		while( tpcFitter.triggerNumber<telescopeFitter.triggerNumberBegin && tpcFitter.getEntry(j++) ) {};
+		//if also larger than end, continue;
+		if( tpcFitter.triggerNumber > telescopeFitter.triggerNumberEnd) continue;
 
 		cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
 		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
-		cout<<" timepix eventNumber: "<<tpcFitter.eventNumber<<endl;
+		cout<<" timepix eventNumber: "<<tpcFitter.triggerNumber<<endl;
 
 		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
 			nTelescopeTriggers++;
@@ -140,7 +142,6 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset
 		cout<<"timepix passed!"<<endl;
 
 		//display event
-		bool displayEvent=false;
 		if( displayEvent ) {
 
 			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
@@ -190,7 +191,7 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset
 
 	cout<<"entries in tree "<<fitResultTree.GetEntriesFast()<<endl;
 
-//	fitResultTree.Draw("timepixFits[0].slope1:telescopeFits[0].slope1");//, "fabs(timepixFits.slope1)<1");
+//	fitResultTree.Draw("timepixFits[].slope1:telescopeFits[].slope1");//, "fabs(timepixFits.slope1)<1");
 	fitResultTree.Draw("ntimepixHits:ntelescopeHits","", "prof");//, "fabs(timepixFits.slope1)<1");
 
 	fitResultTree.Write();
