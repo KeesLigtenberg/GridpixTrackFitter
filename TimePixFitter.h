@@ -66,6 +66,7 @@ private:
 	TTree* hitTable;
 	long long nEvents=0;
 	const std::vector<TimePixHit>* rawHits=nullptr;
+	long long eventNumber=0;
 
 	const DetectorConfiguration& detector;
 	std::unique_ptr<ResidualHistogrammer> residualHistograms;

@@ -70,96 +70,128 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, int offset
 
 	vector<SimpleFitResult> telescopeFits;
 	vector<SimpleFitResult> tpcFits;
+	int ntpcHits, ntelescopeHits;
 
 	TFile outputFile("fitResults.root", "RECREATE");
 	TTree fitResultTree( "fitResultTree", "Tree with telescope and timepix fit results") ;
 	fitResultTree.Branch("telescopeFits", &telescopeFits);
 	fitResultTree.Branch("timepixFits", &tpcFits);
+	fitResultTree.Branch("ntimepixHits", &ntpcHits);
+	fitResultTree.Branch("ntelescopeHits", &ntelescopeHits);
 
 	int nTelescopeTriggers=0,previousTriggerNumberBegin=0;
 	for(int i=0;
-//			i<1000 &&
-			telescopeFitter.getEntry(i) &&
-					tpcFitter.getEntry(telescopeFitter.triggerNumberBegin+offset);
-			i++) {
+//			i<20
+			;i++) {
 
-		cout<<"entry "<<i<<"/"<<telescopeFitter.nEvents<<" ";
-		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd<<endl;
+		if( !telescopeFitter.getEntry(i) ) break;
+		//x telescope == x-1 timepix so offset should be -1!
+		if(telescopeFitter.triggerNumberBegin+offset<0) continue;
+		if( !tpcFitter.getEntry(telescopeFitter.triggerNumberBegin+offset) ) break;
+
+		cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
+		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
+		cout<<" timepix eventNumber: "<<tpcFitter.eventNumber<<endl;
 
 		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
 			nTelescopeTriggers++;
 			previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		}
 
-//		continue;
 
+
+
+		//telescope
+		telescopeFits.clear();
 		auto telescopeHits=telescopeFitter.getSpaceHits();
 		if( !telescopeFitter.passEvent(telescopeHits) ) continue;
 		telescopeHits=telescopeFitter.rotateAndShift(telescopeHits);
 		auto telescopeClusters = telescopeFitter.houghTransform(telescopeHits);
 		for( auto& cluster : telescopeClusters) {
-			if(cluster.size()<2 || cluster.getNPlanesHit()<=1) continue;
+			if(cluster.size()<4 || cluster.getNPlanesHit()<=3) continue;
 			auto fit= linearRegressionFit(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			telescopeFits.push_back(fit);
 		}
+		if(telescopeFits.empty()) continue;
 
+		cout<<"telescope passed!"<<endl;
+
+		//timepix
+		tpcFits.clear();
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) continue;
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
+		for(auto& h: tpcHits) {
+			h.RotatePosition(-0.01, {0,0,10}, {0,1,0});
+			h.RotatePosition(-0.17, {0,7,10}, {1,0,0});
+//			h.SetPosition(h.getPosition() + TVector3(10,0,400) );
+		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters) {
 			if(cluster.size()<2) continue;
 			auto fit= linearRegressionFit(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			tpcFits.push_back(fit);
+//			cout<<"tpc fit: "<<fit<<endl;
 		}
+		if(tpcFits.empty()) continue;
+
+		cout<<"timepix passed!"<<endl;
 
 		//display event
-		bool displayEvent=true;
+		bool displayEvent=false;
 		if( displayEvent ) {
+
 			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
 			timepixCanv->cd();
 			tpcFitter.drawEvent(tpcHits, tpcFits);
 
+//			if( telescopeFitter.processDrawSignals()  ) break;
+
 			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
 			mimosaCanv->cd();
-//			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
-
+			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
+/*
 			DetectorConfiguration combinedSetup{
-					2, {0,200 }, //nplanes, planeposition
+					2, {0,420 }, //nplanes, planeposition
 					0.001, int(1000*mimosa.xmax()), int(1000*mimosa.ymax()) //pixelsize, xpixels, ypixels
 				};
 
-			std::vector<std::vector<PositionHit> > combinedHits(1);
+
+
+			std::vector<PositionHit> combinedHits;
 			for(auto& v: telescopeHits)
 				for(auto& h : v)
-					combinedHits.at(0).push_back(h);
-			rotateHits()
-			combinedHits.push_back(tpcHits);
-			HoughTransformer::drawClusters(combinedHits, combinedSetup);
+					combinedHits.push_back(h);
+			for(auto& h: tpcHits) combinedHits.push_back(h);
+
+
+			HoughTransformer::drawCluster(combinedHits, combinedSetup);
 			for (auto& f : tpcFits)
 				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
 			for (auto& f : telescopeFits)
 				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
-
+//*/
 			gPad->Update();
 
 			if( telescopeFitter.processDrawSignals()  ) break;
 		}
 
+		ntpcHits=tpcHits.size();
+		ntelescopeHits=0;
+		for(auto& v : telescopeHits ) ntelescopeHits+=v.size();
 		fitResultTree.Fill();
 
-		telescopeFits.clear();
-		tpcFits.clear();
 	}
 
-	cout<<"number of telescope unique telescope triggers "<<nTelescopeTriggers<<endl;
+	cout<<"highest telescope trigger (number of unique) "<< telescopeFitter.triggerNumberEnd<<" ("<<nTelescopeTriggers<<")"<<endl;
 	cout<<"number of entries in timepix "<<tpcFitter.nEvents<<endl;
 
 	cout<<"entries in tree "<<fitResultTree.GetEntriesFast()<<endl;
 
-	fitResultTree.DrawClone("timepixFits.slope1:telescopeFits.slope2");
+//	fitResultTree.Draw("timepixFits[0].slope1:telescopeFits[0].slope1");//, "fabs(timepixFits.slope1)<1");
+	fitResultTree.Draw("ntimepixHits:ntelescopeHits","", "prof");//, "fabs(timepixFits.slope1)<1");
 
 	fitResultTree.Write();
 	outputFile.Close();

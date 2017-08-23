@@ -9,8 +9,16 @@ struct PositionHit {
 	double x,y,z;
 	int plane;
 	int ToT=1;
+
 	TVector3 getPosition() const { return {x,y,z}; };
 	void SetPosition(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };
+	void RotatePosition(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis) {
+		TVector3 v=getPosition();
+		v-=rotationPoint;
+		v.Rotate(rotation, rotationAxis);
+		v+=rotationPoint;
+		SetPosition( v);
+	};
 };
 
 inline std::vector<PositionHit> convertHits(const std::vector<Hit>& hv, double planePosition, double pixelwidth, double pixelheight, int plane=0) {
