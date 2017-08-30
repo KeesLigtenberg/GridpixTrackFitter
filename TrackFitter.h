@@ -68,6 +68,7 @@ private:
 	long long nEvents=0;
 	const std::vector<std::vector<Hit>>* mimosaHit=nullptr;
 	unsigned short triggerNumberBegin=0, triggerNumberEnd=0;
+	unsigned int timestamp=0;
 
 	const DetectorConfiguration& detector;
 	HoughTransformer houghTransform;
@@ -85,7 +86,7 @@ private:
 	double slope1FromSum, slope2FromSum;
 
 //friend function!
-	friend void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent);
+	friend double CombineTracks(std::string mimosaInput, std::string timepixInput, int offset, bool displayEvent);
 };
 
 #endif /* TRACKFITTER_H_ */

@@ -67,6 +67,7 @@ private:
 	long long nEvents=0;
 	const std::vector<TimePixHit>* rawHits=nullptr;
 	long long triggerNumber=0;
+	unsigned long long timestamp=0;
 
 	const DetectorConfiguration& detector;
 	std::unique_ptr<ResidualHistogrammer> residualHistograms;
@@ -83,7 +84,7 @@ private:
 	double slope1FromSum, slope2FromSum;
 
 //friend function!
-	friend void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent);
+	friend double CombineTracks(std::string mimosaInput, std::string timepixInput,int offset, bool displayEvent);
 };
 
 #endif /* TimePixFitter_H_ */

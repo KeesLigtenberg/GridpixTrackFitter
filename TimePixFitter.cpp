@@ -38,6 +38,7 @@ TimePixFitter::TimePixFitter(std::string inputfile, const DetectorConfiguration&
 	//setup tree for reading
 	hitTable->SetBranchAddress("timepix", &rawHits);
 	hitTable->SetBranchAddress("triggerNumber", &triggerNumber);
+	hitTable->SetBranchAddress("trigger", &timestamp);
 	nEvents=hitTable->GetEntriesFast();
 	//    unsigned short triggerNumberBegin, triggerNumberEnd;
 //	hitTable->SetBranchAddress("triggerNumberBegin", &triggerNumberBegin);

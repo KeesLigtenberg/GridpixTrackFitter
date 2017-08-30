@@ -9,6 +9,8 @@
 #include <string>
 
 #include "TTree.h"
+#include "TGraph.h"
+#include "TH1.h"
 
 #include "TrackFitter.h"
 #include "TimePixFitter.h"
@@ -31,8 +33,8 @@ struct TimePixDetectorConfiguration : DetectorConfiguration {
 		1, {0}, //nplanes, planeposition
 		0.055, 256, 256 //pixelsize, xpixels, ypixels
 	} {};
-	virtual double xmin() const {return -200*driftSpeed; }
-	virtual double xmax() const {return 200*driftSpeed; }
+	virtual double xmin() const {return driftSpeed; }
+	virtual double xmax() const {return 400*driftSpeed; }
 	virtual double zmin() const {return 0; }
 	virtual double zmax() const {return 256*pixelsize; };
 } timePixChip;
@@ -46,7 +48,8 @@ const DetectorConfiguration mimosa= {
 };
 
 
-void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent=false) {
+//returns correlation factor
+double CombineTracks(std::string mimosaInput, std::string timepixInput, int triggerOffset=0,  bool displayEvent=false) {
 
 	//mimosa
 	trackFitter telescopeFitter(mimosaInput, mimosa);
@@ -67,7 +70,6 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 	tpcFitter.houghTransform.minCandidateSize=6;
 	tpcFitter.houghTransform.minClusterSize=10;
 
-
 	vector<SimpleFitResult> telescopeFits;
 	vector<SimpleFitResult> tpcFits;
 	int ntpcHits, ntelescopeHits;
@@ -79,29 +81,37 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 	fitResultTree.Branch("ntimepixHits", &ntpcHits);
 	fitResultTree.Branch("ntelescopeHits", &ntelescopeHits);
 
+	TH1D timeDifference("timeDifference", "telescope time - timepix time;time [s];entries", 100, -1E-3,1E-3 );
+
 	int nTelescopeTriggers=0,previousTriggerNumberBegin=0;
 	for(int i=0,j=0;
 //			i<20
 			;i++) {
 
+		// Get Entry and match trigger Numbers
+
+		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		if( !telescopeFitter.getEntry(i) ) break;
 
-		//get next entry until tpc trigger number is larger than begin
-		while( tpcFitter.triggerNumber<telescopeFitter.triggerNumberBegin && tpcFitter.getEntry(j++) ) {};
-		//if also larger than end, continue;
-		if( tpcFitter.triggerNumber > telescopeFitter.triggerNumberEnd) continue;
+		//if triggerNumberBegin decreased, we must get entries until the tpc triggernumber also decreases
+		if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin)
+			while( (tpcFitter.triggerNumber+triggerOffset % 32768) > previousTriggerNumberBegin && tpcFitter.getEntry(j++) ) {};
 
-		cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
-		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
-		cout<<" timepix eventNumber: "<<tpcFitter.triggerNumber<<endl;
+		//get next entry until tpc trigger number is larger than begin
+		while( (tpcFitter.triggerNumber+triggerOffset % 32768) <telescopeFitter.triggerNumberBegin && tpcFitter.getEntry(j++) ) {};
+
+		//if also larger than end, continue;
+		if( (tpcFitter.triggerNumber+triggerOffset % 32768) > telescopeFitter.triggerNumberEnd) continue;
+
+//		cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
+//		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
+//		cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber % 32768)<<" in entry "<<j<<endl;
 
 		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
 			nTelescopeTriggers++;
-			previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		}
 
-
-
+		// Fit tracks
 
 		//telescope
 		telescopeFits.clear();
@@ -110,14 +120,14 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 		telescopeHits=telescopeFitter.rotateAndShift(telescopeHits);
 		auto telescopeClusters = telescopeFitter.houghTransform(telescopeHits);
 		for( auto& cluster : telescopeClusters) {
-			if(cluster.size()<4 || cluster.getNPlanesHit()<=3) continue;
+			if(cluster.size()<5 || cluster.getNPlanesHit()<=4) continue;
 			auto fit= linearRegressionFit(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			telescopeFits.push_back(fit);
 		}
 		if(telescopeFits.empty()) continue;
 
-		cout<<"telescope passed!"<<endl;
+//		cout<<"telescope passed!"<<endl;
 
 		//timepix
 		tpcFits.clear();
@@ -125,8 +135,8 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 		if( !tpcFitter.passEvent(tpcHits) ) continue;
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
 		for(auto& h: tpcHits) {
-			h.RotatePosition(-0.01, {0,0,10}, {0,1,0});
-			h.RotatePosition(-0.17, {0,7,10}, {1,0,0});
+//			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
+//			h.RotatePosition(-0.29, {0,7,10}, {1,0,0});
 //			h.SetPosition(h.getPosition() + TVector3(10,0,400) );
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
@@ -139,7 +149,7 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 		}
 		if(tpcFits.empty()) continue;
 
-		cout<<"timepix passed!"<<endl;
+//		cout<<"timepix passed!"<<endl;
 
 		//display event
 		if( displayEvent ) {
@@ -184,6 +194,10 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 		for(auto& v : telescopeHits ) ntelescopeHits+=v.size();
 		fitResultTree.Fill();
 
+		double telescopeSeconds=telescopeFitter.timestamp/40.E6, tpcSeconds=tpcFitter.timestamp/4096.*25E-9;
+		static double firstTimeDifference=telescopeSeconds-tpcSeconds;
+		timeDifference.Fill( telescopeSeconds-tpcSeconds-firstTimeDifference );
+
 	}
 
 	cout<<"highest telescope trigger (number of unique) "<< telescopeFitter.triggerNumberEnd<<" ("<<nTelescopeTriggers<<")"<<endl;
@@ -191,12 +205,19 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 
 	cout<<"entries in tree "<<fitResultTree.GetEntriesFast()<<endl;
 
-//	fitResultTree.Draw("timepixFits[].slope1:telescopeFits[].slope1");//, "fabs(timepixFits.slope1)<1");
-	fitResultTree.Draw("ntimepixHits:ntelescopeHits","", "prof");//, "fabs(timepixFits.slope1)<1");
+	fitResultTree.Draw("timepixFits[].intersept1:telescopeFits[].intersept1");
+//	fitResultTree.Draw("timepixFits[].slope1:telescopeFits[].slope2");//, "fabs(timepixFits.slope1)<1");
+//	fitResultTree.Draw("ntelescopeHits:ntimepixHits","ntimepixHits<1000", "prof");//, "fabs(timepixFits.slope1)<1");
+//	timeDifference.DrawClone();
+
+	TGraph gr(fitResultTree.GetSelectedRows(),
+    		fitResultTree.GetV2(), fitResultTree.GetV1());
 
 	fitResultTree.Write();
+	timeDifference.Write();
 	outputFile.Close();
 
+	return gr.GetCorrelationFactor();
 }
 
 

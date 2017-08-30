@@ -37,7 +37,7 @@ pixelMask makeNoisyPixelMask(TTree* hitTable, int plane, double threshold, std::
 pixelMask makeNoisyPixelMask(TTree* hitTable, double threshold, std::pair<int,int> gridsize ) {
 	int gridx=gridsize.first, gridy=gridsize.second;
 	TH2D hist("noisyPixelMaskHistogram", "histogram of all pixels",gridx,0,gridx,gridy,0,gridy );
-	getHistFromTree(*hitTable, "timepix[].row:timepix[].column", "1", hist.GetName() ,"goff"/*, DEBUG 1e5 */);
+	getHistFromTree(*hitTable, "timepix[].row:timepix[].column", "1", hist.GetName() ,"goff",/* DEBUG*/ 1e5 );
 
 	auto mean = hist.GetEntries()/gridx/gridy;
 //	std::cout<<"mean is "<<mean<<std::endl;

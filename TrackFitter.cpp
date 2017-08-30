@@ -40,6 +40,7 @@ trackFitter::trackFitter(std::string inputfile, const DetectorConfiguration& det
 	//    unsigned short triggerNumberBegin, triggerNumberEnd;
 	hitTable->SetBranchAddress("triggerNumberBegin", &triggerNumberBegin);
 	hitTable->SetBranchAddress("triggerNumberEnd", &triggerNumberEnd);
+	hitTable->SetBranchAddress("timestamp", &timestamp);
 
 }
 
