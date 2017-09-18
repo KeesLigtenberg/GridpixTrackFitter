@@ -8,8 +8,13 @@
 #ifndef LINEARREGRESSIONFIT_H_
 #define LINEARREGRESSIONFIT_H_
 
-#include "HoughTransformer.h"
+#include <TVector3.h>
 #include "TPolyLine3D.h"
+
+#include "HoughTransformer.h"
+
+
+
 
 struct SimpleFitResult {
 	double slope1, intersept1, slope2, intersept2;
@@ -48,8 +53,10 @@ SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster,
 TrackFitResult linearRegressionTrackFit(const HoughTransformer::HitCluster& cluster);
 
 struct Residual { double x,y,z; const PositionHit& h; };
+
 Residual calculateResidual( const PositionHit& h, const SimpleFitResult& fit );
 std::vector<Residual> calculateResiduals( const HoughTransformer::HitCluster& cluster, const SimpleFitResult& fit);
+TVector3 averageResidual(const std::vector<Residual>& residuals);
 
 HoughTransformer::HitCluster& cutOnResiduals( HoughTransformer::HitCluster& cluster, const std::vector<Residual>& residuals, double maxResidual );
 

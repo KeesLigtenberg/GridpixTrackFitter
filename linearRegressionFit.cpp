@@ -41,7 +41,6 @@ SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster,
      *  x = slope1 * z + intersept1\n
      *  y = slope2 * z + intersept2\n
      *
-     *  what kind of regression is this? should we do perpendicular regression?
      */
     double slope1     = (sumX * sumZ - ntot * sumXZ) / (sumZ * sumZ - ntot * sumZsquare);
     double intersept1 = (sumZ * sumXZ - sumZsquare * sumX) / (sumZ * sumZ - ntot * sumZsquare);
@@ -90,7 +89,17 @@ HoughTransformer::HitCluster&  cutOnResiduals( HoughTransformer::HitCluster& clu
 //	std::cout<<"Removed "<<nremoved<<" hits"<<std::endl;
 	return cluster;
 }
-
+TVector3 averageResidual(const std::vector<Residual>& residuals) {
+	double x=0, y=0, z=0;
+	for(auto& r: residuals) {
+		x+=r.x;
+		y+=r.y;
+		z+=r.z;
+	}
+	return { x/=residuals.size(),
+			 y/=residuals.size(),
+			 z/=residuals.size() };
+}
 std::ostream& operator <<(std::ostream& os, SimpleFitResult& fit) {
 	return os<<"SimpleFitResult: slopes("<<fit.slope1<<", "<<fit.slope2<<") intersepts("<<fit.intersept1<<", "<<fit.intersept2<<")";
 }
