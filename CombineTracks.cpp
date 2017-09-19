@@ -73,9 +73,9 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 	telescopeFitter.makeMask(5e3);
 
-	telescopeFitter.setShifts( savedShifts );
-	telescopeFitter.setAngles( savedAngles );
-//	telescopeFitter.setSlopes( savedSlopes );
+	telescopeFitter.setShifts( savedShifts ); //xy shift of planes
+	telescopeFitter.setAngles( savedAngles ); //planes rotation along z-axis in xy plane
+//	telescopeFitter.setSlopes( savedSlopes ); //slope along z, undone later by rotation of all hits
 
 
 	//timepix
@@ -110,7 +110,6 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			;i++) {
 
 		// Get Entry and match trigger Numbers
-
 		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		if( !telescopeFitter.getEntry(i) ) break;
 
@@ -163,7 +162,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			h.y=-h.y;
 //			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
 			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
-			h.SetPosition(h.getPosition() + TVector3(6,14,-300) );
+			h.SetPosition(h.getPosition() + TVector3(6,14,-380) );
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters ) {
@@ -184,7 +183,9 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			timepixCanv->cd();
 			tpcFitter.drawEvent(tpcHits, tpcFits);
 			for (auto& f : telescopeFits)
-				f.draw(timePixChip.zmin()-300, timePixChip.zmax()-300);
+				f.draw(timePixChip.zmin()-380, timePixChip.zmax()-380);
+			for (auto& f : tpcFits)
+				f.draw( timePixChip.zmin()-380, timePixChip.zmin()-380 );
 			gPad->Update();
 
 //			if( telescopeFitter.processDrawSignals()  ) break;
@@ -219,6 +220,12 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		}
 
 		auto residuals=calculateResiduals(tpcClusters.front(), telescopeFits[0]);
+		//rotate back to frame of timepix
+		for(auto& r:residuals) {
+			auto v=r.getVector();
+			v.Rotate(-0.29, {1,0,0});
+			r.setVector(v);
+		}
 		tpcResiduals.clear();
 		tpcResiduals.insert(tpcResiduals.begin(), residuals.begin(), residuals.end());
 		if(residualHistograms) {

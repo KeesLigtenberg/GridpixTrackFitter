@@ -48,11 +48,16 @@ struct TrackFitResult {
 
 std::ostream& operator<<(std::ostream& os, SimpleFitResult& fit);
 
-SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster, double er=0 ) ;
+SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster ) ;
 
 TrackFitResult linearRegressionTrackFit(const HoughTransformer::HitCluster& cluster);
 
-struct Residual { double x,y,z; const PositionHit& h; };
+struct Residual {
+	double x,y,z;
+	const PositionHit& h;
+	TVector3 getVector() { return TVector3(x,y,z); };
+	void setVector(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };
+};
 
 Residual calculateResidual( const PositionHit& h, const SimpleFitResult& fit );
 std::vector<Residual> calculateResiduals( const HoughTransformer::HitCluster& cluster, const SimpleFitResult& fit);
