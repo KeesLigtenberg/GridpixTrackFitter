@@ -19,6 +19,7 @@
 struct SimpleFitResult {
 	double slope1, intersept1, slope2, intersept2;
 	double dslope1, dintersept1, dslope2, dintersept2; //uncertainties
+//	const HoughTransformer::HitCluster* hitCluster; solve issue with streamer first
 	void draw(double zmin, double zmax) const {
 		const int npoints=2;
 		double x[npoints] = {slope1 * zmin + intersept1, slope1 * zmax + intersept1};
@@ -27,9 +28,11 @@ struct SimpleFitResult {
 		TPolyLine3D l( npoints, x, y, z );
 		l.DrawClone();
 	}
-	bool isValid() {
+	bool isValid() const {
 		return !(std::isnan(slope1) || std::isnan(slope2) || std::isnan(intersept1) || std::isnan(intersept2) );
 	}
+	double xAt(double z) const { return slope1*z+intersept1; };
+	double yAt(double z) const { return slope2*z+intersept2; };
 };
 
 //root dictionary for use in TTree

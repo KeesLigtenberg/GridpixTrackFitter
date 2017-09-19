@@ -141,7 +141,7 @@ SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster)
 
     return SimpleFitResult {
     	slope1, intersept1, slope2, intersept2,
-    	dslope1, dintersept1, dslope2, dintersept2 };
+    	dslope1, dintersept1, dslope2, dintersept2};
 }
 
 

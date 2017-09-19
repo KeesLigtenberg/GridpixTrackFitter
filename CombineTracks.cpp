@@ -40,6 +40,7 @@ struct TimePixDetectorConfiguration : DetectorConfiguration {
 	virtual double zmin() const {return 0; }
 	virtual double zmax() const {return 256*pixelsize; };
 } timePixChip;
+const double timepixZCenter=-374;
 
 const DetectorConfiguration mimosa= {
 	6, //planes
@@ -64,6 +65,7 @@ struct ResidualTreeEntry {
 	int row, col;
 };
 #pragma link C++ class std::vector<ResidualTreeEntry>+;
+//#pragma link C++ class std::vector< std::vector<ResidualTreeEntry> >+;
 
 //returns correlation factor
 double CombineTracks(std::string mimosaInput, std::string timepixInput, int triggerOffset=0,  bool displayEvent=false) {
@@ -155,6 +157,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 		//timepix
 		tpcFits.clear();
+		vector<HoughTransformer::HitCluster*> tpcFittedClusters;
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) continue;
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
@@ -162,7 +165,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			h.y=-h.y;
 //			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
 			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
-			h.SetPosition(h.getPosition() + TVector3(6,14,-380) );
+			h.SetPosition(h.getPosition() + TVector3(6,14,timepixZCenter) );
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters ) {
@@ -170,6 +173,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			auto fit= linearRegressionFit(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			tpcFits.push_back(fit);
+			tpcFittedClusters.push_back(&cluster);
 //			cout<<"tpc fit: "<<fit<<endl;
 		}
 		if(tpcFits.empty()) continue;
@@ -183,9 +187,9 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			timepixCanv->cd();
 			tpcFitter.drawEvent(tpcHits, tpcFits);
 			for (auto& f : telescopeFits)
-				f.draw(timePixChip.zmin()-380, timePixChip.zmax()-380);
+				f.draw(timePixChip.zmin()+timepixZCenter, timePixChip.zmax()+timepixZCenter);
 			for (auto& f : tpcFits)
-				f.draw( timePixChip.zmin()-380, timePixChip.zmin()-380 );
+				f.draw( timePixChip.zmin()+timepixZCenter, timePixChip.zmin()+timepixZCenter );
 			gPad->Update();
 
 //			if( telescopeFitter.processDrawSignals()  ) break;
@@ -219,19 +223,37 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			if( telescopeFitter.processDrawSignals()  ) break;
 		}
 
-		auto residuals=calculateResiduals(tpcClusters.front(), telescopeFits[0]);
-		//rotate back to frame of timepix
-		for(auto& r:residuals) {
-			auto v=r.getVector();
-			v.Rotate(-0.29, {1,0,0});
-			r.setVector(v);
-		}
+
+		//match fits and clusters
 		tpcResiduals.clear();
-		tpcResiduals.insert(tpcResiduals.begin(), residuals.begin(), residuals.end());
-		if(residualHistograms) {
-			if( averageResidual(residuals).Perp()<3 )
-				residualHistograms->fill(residuals);
+		int nmatched=0;
+		for(const auto& tpcFit : tpcFits ) {
+			for(const auto& telescopeFit : telescopeFits) {
+				//should we use the actual errors of the fit here?
+				if( fabs( tpcFit.xAt(timepixZCenter)-telescopeFit.xAt(timepixZCenter) ) < 1.5
+				    && fabs( tpcFit.yAt(timepixZCenter)-telescopeFit.yAt(timepixZCenter) ) < 1.5  ) {
+
+					auto residuals=calculateResiduals(*tpcFittedClusters.at(nmatched), telescopeFit);
+					//rotate back to frame of timepix
+					for(auto& r:residuals) {
+						auto v=r.getVector();
+						v.Rotate(-0.29, {1,0,0});
+						r.setVector(v);
+					}
+					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
+//					tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
+
+					if(residualHistograms) {
+						residualHistograms->fill(residuals);
+					}
+
+					nmatched++;
+					break;
+				}
+			}
 		}
+		cout<<"matched "<<nmatched<<" clusters"<<endl;
+
 
 		ntpcHits=tpcHits.size();
 		ntelescopeHits=0;
@@ -249,7 +271,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 	cout<<"entries in tree "<<fitResultTree.GetEntriesFast()<<endl;
 
-	fitResultTree.Draw("timepixFits[0].intersept1:telescopeFits[0].intersept1");
+	fitResultTree.Draw("timepixFits[0].intersept2-374*timepixFits[0].slope2:telescopeFits[0].intersept2-374*timepixFits[0].slope2");
 //	fitResultTree.Draw("timepixFits[0].slope1:telescopeFits[].slope2");//, "fabs(timepixFits.slope1)<1");
 //	fitResultTree.Draw("ntelescopeHits:ntimepixHits","ntimepixHits<1000", "prof");//, "fabs(timepixFits.slope1)<1");
 //	timeDifference.DrawClone();
