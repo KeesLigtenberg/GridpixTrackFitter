@@ -8,12 +8,27 @@
 #ifndef LINEARREGRESSIONFIT_H_
 #define LINEARREGRESSIONFIT_H_
 
+#include <array>
+
 #include <TVector3.h>
 #include "TPolyLine3D.h"
 
 #include "HoughTransformer.h"
 
+struct FitResult2D {
+	FitResult2D( double slope, double intercept, std::array<double, 3> error, double interceptz=0 ):
+		slope(slope),
+		intercept(intercept),
+		error(error),
+		interceptz(interceptz)
+	{
+	}
 
+	double slope, intercept;
+	double interceptz;
+	std::array<double, 3> error; //dslope^2, dslopeintercept, dintercept^2
+
+};
 
 
 struct SimpleFitResult {
