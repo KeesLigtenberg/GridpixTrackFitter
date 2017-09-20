@@ -10,19 +10,20 @@
 #include "linearRegressionFit.h"
 
 
-void regressionXZ(const HoughTransformer::HitCluster& cluster) {
+FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double interceptz=0) {
     double sumX = 0;
     double sumZ = 0;
     double sumXZ = 0;
     double sumZsquare = 0;  // = Sum (Z^2)
     double sumW = 0;
 
-    for(auto& h : cluster) {
+    for(const auto& h : cluster) {
     	double errorx2=1;
+    	double hiz=h.z-interceptz;
 		sumX += h.x/errorx2;
-		sumZ += h.z/errorx2;
-		sumXZ += h.x*h.z/errorx2;
-		sumZsquare += h.z*h.z/errorx2;
+		sumZ += hiz/errorx2;
+		sumXZ += h.x*hiz/errorx2;
+		sumZsquare += hiz*hiz/errorx2;
 		sumW+=1/errorx2;
     }
 
@@ -49,9 +50,11 @@ void regressionXZ(const HoughTransformer::HitCluster& cluster) {
     double sigmaSlopeIntercept=-sumZ/denominator;
     std::vector<double> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
 
+    return FitResult2D(slope1, intersept1, error , interceptz);
+
 }
 
-void regressionYZ(const HoughTransformer::HitCluster& cluster) {
+FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double interceptz=0) {
     double sumY = 0;
     double sumZ = 0;
     double sumYZ = 0;
@@ -60,10 +63,11 @@ void regressionYZ(const HoughTransformer::HitCluster& cluster) {
 
     for(auto& h : cluster) {
     	double errory2=1;//add error!
-		sumY += h.x/errory2;
-		sumZ += h.z/errory2;
-		sumYZ += h.x*h.z/errory2;
-		sumZsquare += h.z*h.z/errory2;
+    	double hiz=h.z-interceptz;
+		sumY += h.y/errory2;
+		sumZ += hiz/errory2;
+		sumYZ += h.y*hiz/errory2;
+		sumZsquare += hiz*hiz/errory2;
 		sumW+=1/errory2;
     }
 
@@ -90,6 +94,15 @@ void regressionYZ(const HoughTransformer::HitCluster& cluster) {
     double sigmaSlopeIntercept=-sumZ/denominator;
     std::vector<double> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
 
+    return FitResult2D(slope1, intersept1, error, interceptz );
+
+}
+
+FitResult3D regression3d(const HoughTransformer::HitCluster& cluster, double interceptz=0) {
+	return FitResult3D {
+		regressionXZ(cluster, interceptz),
+		regressionYZ(cluster, interceptz)
+	};
 }
 
 SimpleFitResult linearRegressionFit(const HoughTransformer::HitCluster& cluster) {

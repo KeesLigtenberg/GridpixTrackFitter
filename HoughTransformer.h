@@ -60,6 +60,14 @@ struct HoughTransformer {
 			}
 			return getNPlanesHit();
 		}
+		TVector3 getAveragePosition() const {
+			TVector3 sum(0,0,0);
+			for(const auto& hit : *this) {
+				sum+=hit.getPosition();
+			}
+			sum*=(1./this->size());
+			return sum;
+		}
 	};
 
 	template<class T >

@@ -27,9 +27,15 @@ struct FitResult2D {
 	double slope, intercept;
 	double interceptz;
 	std::array<double, 3> error; //dslope^2, dslopeintercept, dintercept^2
+	double at(double z) { return intercept+slope*(z-interceptz); }
 
 };
 
+struct FitResult3D {
+	FitResult3D(FitResult2D XZ, FitResult2D YZ) : XZ(XZ), YZ(YZ) {}
+
+	FitResult2D XZ, YZ;
+};
 
 struct SimpleFitResult {
 	double slope1, intersept1, slope2, intersept2;

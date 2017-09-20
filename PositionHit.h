@@ -5,6 +5,7 @@
 #include "TVector3.h"
 
 struct PositionHit {
+	PositionHit() : PositionHit(0,0,0) {};
 	PositionHit(double x, double y, double z, int plane=0, int row=0, int column=0, int ToT=1) : x(x), y(y), z(z), plane(plane), ToT(ToT), row(row), column(column) {};
 	double x,y,z;
 	int row, column, plane;
