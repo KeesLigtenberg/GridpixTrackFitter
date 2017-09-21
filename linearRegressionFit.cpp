@@ -48,7 +48,7 @@ FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double int
     double sigmaSlope2=sumZsquare/denominator;
     double sigmaIntercept2=sumW/denominator;
     double sigmaSlopeIntercept=-sumZ/denominator;
-    std::vector<double> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
+    std::array<double,3> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
 
     return FitResult2D(slope1, intersept1, error , interceptz);
 
@@ -92,7 +92,7 @@ FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double int
     double sigmaSlope2=sumZsquare/denominator;
     double sigmaIntercept2=sumW/denominator;
     double sigmaSlopeIntercept=-sumZ/denominator;
-    std::vector<double> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
+    std::array<double,3> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
 
     return FitResult2D(slope1, intersept1, error, interceptz );
 

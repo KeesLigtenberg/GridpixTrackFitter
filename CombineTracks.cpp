@@ -50,22 +50,26 @@ const DetectorConfiguration mimosa= {
 	1153, 577 //row, column, ://one extra because exampleData starts at 1 and our data starts at 0 //TODO: change this to one or the other!
 };
 
-struct ResidualTreeEntry {
-	ResidualTreeEntry() : x(), y(), z(), ToT(), row(), col() {};
-	ResidualTreeEntry(Residual r) :
-		x(r.x),
-		y(r.y),
-		z(r.z),
+struct HitEntry {
+	HitEntry() : rx(), ry(), rz(),x(),y(),z(), ToT(), row(), col() {};
+	HitEntry(Residual r) :
+		rx(r.x),
+		ry(r.y),
+		rz(r.z),
+		x(r.h.x),
+		y(r.h.y),
+		z(r.h.z),
 		ToT(r.h.ToT),
 		row(r.h.row),
 		col(r.h.column)
 	{};
+	double rx, ry, rz;
 	double x, y, z;
 	int ToT;
 	int row, col;
 };
-#pragma link C++ class std::vector<ResidualTreeEntry>+;
-//#pragma link C++ class std::vector< std::vector<ResidualTreeEntry> >+;
+#pragma link C++ class std::vector<HitEntry>+;
+#pragma link C++ class std::vector< std::vector<HitEntry> >+;
 
 //returns correlation factor
 double CombineTracks(std::string mimosaInput, std::string timepixInput, int triggerOffset=0,  bool displayEvent=false) {
@@ -76,8 +80,8 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 	telescopeFitter.makeMask(5e3);
 
 	telescopeFitter.setShifts( savedShifts ); //xy shift of planes
-	telescopeFitter.setAngles( savedAngles ); //planes rotation along z-axis in xy plane
-//	telescopeFitter.setSlopes( savedSlopes ); //slope along z, undone later by rotation of all hits
+	telescopeFitter.setAngles( savedAngles ); //planes rotation along rz-axis in xy plane
+//	telescopeFitter.setSlopes( savedSlopes ); //slope along rz, undone later by rotation of all hits
 
 
 	//timepix
@@ -91,16 +95,16 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 	vector<SimpleFitResult> telescopeFits;
 	vector<SimpleFitResult> tpcFits;
-	vector<ResidualTreeEntry> tpcResiduals;
+	vector< vector<HitEntry> > tpcResiduals;
 	int ntpcHits, ntelescopeHits;
 
 	std::unique_ptr<TFile> outputFile( displayEvent ? nullptr : new TFile("fitResults.root", "RECREATE") );
-	TTree fitResultTree( "fitResultTree", "Tree with telescope and timepix fit results") ;
+	TTree fitResultTree( "fitResults", "Tree with telescope and timepix fit results") ;
 	fitResultTree.Branch("telescopeFits", &telescopeFits);
 	fitResultTree.Branch("timepixFits", &tpcFits);
 	fitResultTree.Branch("ntimepixHits", &ntpcHits);
 	fitResultTree.Branch("ntelescopeHits", &ntelescopeHits);
-	fitResultTree.Branch("timepixResiduals", &tpcResiduals);
+	fitResultTree.Branch("timepixHits", &tpcResiduals);
 
 	//histograms
 	auto residualHistograms=unique_ptr<ResidualHistogrammer>(displayEvent ? nullptr : new ResidualHistogrammer("timepixTelescopeTrackResiduals.root", timePixChip));
@@ -245,8 +249,8 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 						v.Rotate(-0.29, {1,0,0});
 						r.setVector(v);
 					}
-					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
-//					tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
+//					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
+					tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
 
 					if(residualHistograms) {
 						residualHistograms->fill(residuals);
