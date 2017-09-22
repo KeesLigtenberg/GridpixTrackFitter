@@ -16,8 +16,9 @@ int ResidualHistogrammer::PlaneHistograms::n=0;
 
 ResidualHistogrammer::ResidualHistogrammer(std::string outputFileName, const DetectorConfiguration& detector) :
 		outputFile(outputFileName.c_str(), "RECREATE"),
+		detector(detector),
 		planeHist(),
-		detector(detector)
+		xResidualByToT( "xResidualByToT", "xResidualByToT", 40, 0,1)
 {
 	planeHist.reserve(detector.nPlanes);
 	for(int i=0; i<detector.nPlanes; ++i) planeHist.emplace_back( detector );
@@ -37,6 +38,8 @@ void ResidualHistogrammer::fill(const Residual& r, const std::pair<double, doubl
 	plane.yResidual.Fill( r.y );
 	plane.xResidualByPixel.Fill( h.x, h.y, r.x );
 	plane.yResidualByPixel.Fill( h.x, h.y, r.y );
+
+	xResidualByToT.Fill(h.ToT/4096.*25, r.x);
 
 	double xc=rotationPoint.first, yc=rotationPoint.second; //x and y center
 	double hx=h.x-xc, hy=h.y-yc;

@@ -23,19 +23,21 @@
 #include "linearRegressionFit.cpp"
 #include "ResidualHistogrammer.cpp"
 #include "makeNoisyPixelMask.cpp"
+#include "TrackFitter.cpp"
 #endif
 
 using namespace std;
 
 struct TimePixDetectorConfiguration : DetectorConfiguration {
+	static constexpr double driftSpeed=0.075; //mm/ns
 	TimePixDetectorConfiguration() : DetectorConfiguration{
 		1, {0}, //nplanes, planeposition
-		1, 256, 256 //pixelsize, xpixels, ypixels
+		0.055, 256, 256 //pixelsize, xpixels, ypixels
 	} {};
-	virtual double xmin() const {return -200; }
-	virtual double xmax() const {return 200; }
+	virtual double xmin() const {return driftSpeed; }
+	virtual double xmax() const {return 400*driftSpeed; }
 	virtual double zmin() const {return 0; }
-	virtual double zmax() const {return 256; };
+	virtual double zmax() const {return 256*pixelsize; };
 } timePixChip;
 
 void FitTracksTimePix(std::string inputfile) {
@@ -49,7 +51,7 @@ void FitTracksTimePix(std::string inputfile) {
 	tpcFitter.houghTransform.minCandidateSize=6;
 	tpcFitter.houghTransform.minClusterSize=10;
 
-	tpcFitter.displayEvent=true;
+	tpcFitter.displayEvent=false;
 
 	tpcFitter.fitTracks("timepixHistograms.root");
 

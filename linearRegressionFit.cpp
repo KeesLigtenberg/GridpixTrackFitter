@@ -177,6 +177,8 @@ std::vector<Residual> calculateResiduals( const HoughTransformer::HitCluster& cl
 	}
 	return residuals;
 }
+
+//function invalidates residuals reference to hits!
 HoughTransformer::HitCluster&  cutOnResiduals( HoughTransformer::HitCluster& cluster, const std::vector<Residual>& residuals, double maxResidual ) {
 	auto res=residuals.begin();
 	int nremoved=cluster.size();

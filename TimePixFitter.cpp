@@ -12,7 +12,6 @@
 
 //#include "/user/cligtenb/rootmacros/getObjectFromFile.h"
 #include "getObjectFromFile.h"
-#include "linearRegressionFit.h"
 #include "makeNoisyPixelMask.h"
 #include "transformHits.h"
 #include "ResidualHistogrammer.h"
@@ -283,4 +282,18 @@ std::pair<double, double> TimePixFitter::getSlopes() const {
 void TimePixFitter::setSlopes(std::pair<double, double> slopes) {
 	houghTransform.angleOfTracksX=slopes.first;
 	houghTransform.angleOfTracksY=slopes.second;
+}
+
+std::vector<PositionHit>& TimePixFitter::correctTimeWalk(
+		std::vector<PositionHit>& spaceHit, double coefficient /*mm/ns*/, double minToT) {
+//	cout<<spaceHit.size()<<" - ";
+	spaceHit.erase(
+			std::remove_if(spaceHit.begin(), spaceHit.end(), [&minToT](const PositionHit&h) {return (h.ToT/4096.*25) <minToT;} ),
+			spaceHit.end()
+	);
+//	cout<<spaceHit.size()<<endl;
+	for(auto& h : spaceHit) {
+		h.x=h.x-coefficient/(h.ToT/4096.*25);
+	}
+	return spaceHit;
 }

@@ -11,6 +11,7 @@
 
 #include "TFile.h"
 #include "TH1.h"
+#include "TProfile.h"
 #include "TProfile2D.h"
 
 #include "linearRegressionFit.h"
@@ -55,6 +56,7 @@ public:
 		TProfile2D xResidualByPixel, yResidualByPixel, zRotationByPixel;
 	};
 	std::vector<PlaneHistograms> planeHist;
+	TProfile xResidualByToT;
 
 };
 

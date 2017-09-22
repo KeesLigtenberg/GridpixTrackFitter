@@ -97,6 +97,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 	vector<SimpleFitResult> tpcFits;
 	vector< vector<HitEntry> > tpcResiduals;
 	int ntpcHits, ntelescopeHits;
+	vector<int> tpcClusterSize;
 
 	std::unique_ptr<TFile> outputFile( displayEvent ? nullptr : new TFile("fitResults.root", "RECREATE") );
 	TTree fitResultTree( "fitResults", "Tree with telescope and timepix fit results") ;
@@ -104,6 +105,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 	fitResultTree.Branch("timepixFits", &tpcFits);
 	fitResultTree.Branch("ntimepixHits", &ntpcHits);
 	fitResultTree.Branch("ntelescopeHits", &ntelescopeHits);
+	fitResultTree.Branch("timepixClusterSize", &tpcClusterSize);
 	fitResultTree.Branch("timepixHits", &tpcResiduals);
 
 	//histograms
@@ -165,11 +167,12 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) continue;
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
+		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
 //			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
 			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
-			h.SetPosition(h.getPosition() + TVector3(6,14,timepixZCenter) );
+			h.SetPosition(h.getPosition() + TVector3(6+0.62,14-0.0543605,timepixZCenter) );
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters ) {
@@ -184,57 +187,13 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 //		cout<<"timepix passed!"<<endl;
 
-		//display event
-		if( displayEvent ) {
-
-			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
-			timepixCanv->cd();
-			tpcFitter.drawEvent(tpcHits, tpcFits);
-			for (auto& f : telescopeFits)
-				f.draw(timePixChip.zmin()+timepixZCenter, timePixChip.zmax()+timepixZCenter);
-			for (auto& f : tpcFits)
-				f.draw( timePixChip.zmin()+timepixZCenter, timePixChip.zmin()+timepixZCenter );
-			gPad->Update();
-
-//			if( telescopeFitter.processDrawSignals()  ) break;
-/*
-			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
-			mimosaCanv->cd();
-			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
-
-			DetectorConfiguration combinedSetup{
-					2, {-350,200 }, //nplanes, planeposition
-					0.001, int(1000*mimosa.xmax()), int(1000*mimosa.ymax()) //pixelsize, xpixels, ypixels
-				};
-
-
-
-			std::vector<PositionHit> combinedHits;
-			for(auto& v: telescopeHits)
-				for(auto& h : v)
-					combinedHits.push_back(h);
-			for(auto& h: tpcHits) combinedHits.push_back(h);
-
-
-			HoughTransformer::drawCluster(combinedHits, combinedSetup);
-			for (auto& f : tpcFits)
-				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
-			for (auto& f : telescopeFits)
-				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
-//*/
-			gPad->Update();
-
-			if( telescopeFitter.processDrawSignals()  ) break;
-		}
-
-
 		//match fits and clusters
 		tpcResiduals.clear();
 		int nmatched=0;
 		std::vector<bool> tpcFitIsMatched(tpcFits.size()), telescopeFitIsMatched(telescopeFits.size());
-		for(int iFit=0; iFit<tpcFits.size();++iFit) {
+		for(unsigned iFit=0; iFit<tpcFits.size();++iFit) {
 			const auto& tpcFit=tpcFits[iFit];
-			for(int jFit=0; jFit<telescopeFits.size(); jFit++) {
+			for(unsigned jFit=0; jFit<telescopeFits.size(); jFit++) {
 				const auto& telescopeFit = telescopeFits[jFit];
 				//should we use the actual errors of the fit here?
 				if( fabs( tpcFit.xAt(timepixZCenter)-telescopeFit.xAt(timepixZCenter) ) < 1.5
@@ -281,6 +240,53 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			}
 		}
 
+		//display event
+		if( displayEvent ) {
+
+			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
+			timepixCanv->cd();
+			tpcFitter.drawEvent(tpcHits, tpcFits);
+			for (auto& f : telescopeFits)
+				f.draw(timePixChip.zmin()+timepixZCenter, timePixChip.zmax()+timepixZCenter);
+			for (auto& f : tpcFits)
+				f.draw( timePixChip.zmin()+timepixZCenter, timePixChip.zmin()+timepixZCenter );
+			gPad->Update();
+
+//			if( telescopeFitter.processDrawSignals()  ) break;
+/*
+			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
+			mimosaCanv->cd();
+			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
+
+			DetectorConfiguration combinedSetup{
+					2, {-350,200 }, //nplanes, planeposition
+					0.001, int(1000*mimosa.xmax()), int(1000*mimosa.ymax()) //pixelsize, xpixels, ypixels
+				};
+
+
+
+			std::vector<PositionHit> combinedHits;
+			for(auto& v: telescopeHits)
+				for(auto& h : v)
+					combinedHits.push_back(h);
+			for(auto& h: tpcHits) combinedHits.push_back(h);
+
+
+			HoughTransformer::drawCluster(combinedHits, combinedSetup);
+			for (auto& f : tpcFits)
+				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
+			for (auto& f : telescopeFits)
+				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
+//*/
+			gPad->Update();
+
+			if( telescopeFitter.processDrawSignals()  ) break;
+		}
+
+		tpcClusterSize.clear();
+		for(unsigned iClust=0; iClust<tpcFittedClusters.size(); ++iClust) {
+			if(tpcFitIsMatched[iClust])	tpcClusterSize.push_back( tpcFittedClusters[iClust]->size());//count cluster size of only fitted clusters
+		}
 		ntpcHits=tpcHits.size();
 		ntelescopeHits=0;
 		for(auto& v : telescopeHits ) ntelescopeHits+=v.size();
@@ -297,14 +303,16 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 	cout<<"entries in tree "<<fitResultTree.GetEntriesFast()<<endl;
 
-	fitResultTree.Draw("timepixFits[0].intersept2-374*timepixFits[0].slope2:telescopeFits[0].intersept2-374*telescopeFits[0].slope2");
 //	fitResultTree.Draw("timepixFits[0].slope1:telescopeFits[].slope2");//, "fabs(timepixFits.slope1)<1");
 //	fitResultTree.Draw("ntelescopeHits:ntimepixHits","ntimepixHits<1000", "prof");//, "fabs(timepixFits.slope1)<1");
 //	timeDifference.DrawClone();
 //	residualHistograms->DrawClone();
 
-	TGraph gr(fitResultTree.GetSelectedRows(),
-    		fitResultTree.GetV2(), fitResultTree.GetV1());
+//	fitResultTree.Draw("timepixFits[0].intersept2-374*timepixFits[0].slope2:telescopeFits[0].intersept2-374*telescopeFits[0].slope2");
+//	TGraph gr(fitResultTree.GetSelectedRows(),
+//    		fitResultTree.GetV2(), fitResultTree.GetV1());
+//	TFitResultPtr fit=gr.Fit("x+[0]", "S");
+//	cout<<"x shift is "<<fit->Parameter(0);
 
 	if(outputFile) {
 		outputFile->cd();
@@ -313,7 +321,8 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		outputFile->Close();
 	}
 
-	return gr.GetCorrelationFactor();
+//	return gr.GetCorrelationFactor();
+	return 0;
 }
 
 

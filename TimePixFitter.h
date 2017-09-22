@@ -17,6 +17,7 @@
 #include "HoughTransformer.h"
 #include "PositionHit.h"
 #include "makeNoisyPixelMask.h"
+#include "linearRegressionFit.h"
 
 class ResidualHistogrammer;
 class TrackHistogrammer;
@@ -60,6 +61,8 @@ protected:
 	std::vector<PositionHit> getSpaceHits();
 	std::vector<PositionHit>&  rotateAndShift(
 			std::vector<PositionHit>& spaceHit);
+	std::vector<PositionHit>&  correctTimeWalk(
+			std::vector<PositionHit>& spaceHit, double coefficient, double minToT=0);
 
 private:
 	TFile* file;
