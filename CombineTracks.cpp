@@ -16,6 +16,7 @@
 #include "TimePixFitter.h"
 #include "linearRegressionFit.h"
 #include "ResidualHistogrammer.h"
+#include "HitEntry.h"
 
 #if 1 //root?
 #include "linearRegressionFit.cpp"
@@ -50,27 +51,6 @@ const DetectorConfiguration mimosa= {
 	1153, 577 //row, column, ://one extra because exampleData starts at 1 and our data starts at 0 //TODO: change this to one or the other!
 };
 
-struct HitEntry {
-	HitEntry() : rx(), ry(), rz(),x(),y(),z(), ToT(), row(), col() {};
-	HitEntry(Residual r) :
-		rx(r.x),
-		ry(r.y),
-		rz(r.z),
-		x(r.h.x),
-		y(r.h.y),
-		z(r.h.z),
-		ToT(r.h.ToT),
-		row(r.h.row),
-		col(r.h.column)
-	{};
-	double rx, ry, rz;
-	double x, y, z;
-	int ToT;
-	int row, col;
-};
-#pragma link C++ class std::vector<HitEntry>+;
-#pragma link C++ class std::vector< std::vector<HitEntry> >+;
-
 //returns correlation factor
 double CombineTracks(std::string mimosaInput, std::string timepixInput, int triggerOffset=0,  bool displayEvent=false) {
 
@@ -98,6 +78,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 	vector< vector<HitEntry> > tpcResiduals;
 	int ntpcHits, ntelescopeHits;
 	vector<int> tpcClusterSize;
+	double dxz, dyz;
 
 	std::unique_ptr<TFile> outputFile( displayEvent ? nullptr : new TFile("fitResults.root", "RECREATE") );
 	TTree fitResultTree( "fitResults", "Tree with telescope and timepix fit results") ;
@@ -107,9 +88,13 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 	fitResultTree.Branch("ntelescopeHits", &ntelescopeHits);
 	fitResultTree.Branch("timepixClusterSize", &tpcClusterSize);
 	fitResultTree.Branch("timepixHits", &tpcResiduals);
+	fitResultTree.Branch("dxz", &dxz);
+	fitResultTree.Branch("dyz", &dyz);
 
 	//histograms
 	auto residualHistograms=unique_ptr<ResidualHistogrammer>(displayEvent ? nullptr : new ResidualHistogrammer("timepixTelescopeTrackResiduals.root", timePixChip));
+	TH1D dyzAveragePosition("dyzAveragePosition", "distance of average position to telescope track;d_{yz} [mm];entries", 100, -1,1 );
+	TH1D dxzAveragePosition("dxzAveragePosition", "distance of average position to telescope track;d_{xz} [mm];entries", 100, -1,1 );
 	TH1D timeDifference("timeDifference", "telescope time - timepix time;time [s];entries", 100, -1E-3,1E-3 );
 
 	int nTelescopeTriggers=0,previousTriggerNumberBegin=0;
@@ -144,7 +129,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		//telescope
 		telescopeFits.clear();
 		auto telescopeHits=telescopeFitter.getSpaceHits();
-		if( !telescopeFitter.passEvent(telescopeHits) ) continue;
+		if( !telescopeFitter.passEvent(telescopeHits) ) continue; //minimal 4 planes!
 		telescopeHits=telescopeFitter.rotateAndShift(telescopeHits);
 		for(auto&v:telescopeHits) for(auto&h:v) {
 			h.RotatePosition(-savedSlopes.first, {mimosa.getCentre().first,mimosa.getCentre().second,0}, {0,1,0} );
@@ -196,8 +181,8 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			for(unsigned jFit=0; jFit<telescopeFits.size(); jFit++) {
 				const auto& telescopeFit = telescopeFits[jFit];
 				//should we use the actual errors of the fit here?
-				if( fabs( tpcFit.xAt(timepixZCenter)-telescopeFit.xAt(timepixZCenter) ) < 1.5
-				    && fabs( tpcFit.yAt(timepixZCenter)-telescopeFit.yAt(timepixZCenter) ) < 1.5  ) {
+				if( fabs( tpcFit.xAt(timepixZCenter)-telescopeFit.xAt(timepixZCenter) ) < 5
+				    && fabs( tpcFit.yAt(timepixZCenter)-telescopeFit.yAt(timepixZCenter) ) < 5  ) {
 
 					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl;}
 
@@ -211,6 +196,12 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 //					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
 					tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
 
+					TVector3 average=tpcFittedClusters.at(iFit)->getAveragePosition();
+					dyz=(average.z()*telescopeFit.slope2+telescopeFit.intersept2-average.y())/sqrt(1+telescopeFit.slope2*telescopeFit.slope2);
+					dxz=(average.z()*telescopeFit.slope1+telescopeFit.intersept1-average.x())/sqrt(1+telescopeFit.slope1*telescopeFit.slope1);
+					dyzAveragePosition.Fill( dyz );
+					dxzAveragePosition.Fill( dxz );//in telescope frame
+
 					if(residualHistograms) {
 						residualHistograms->fill(residuals);
 					}
@@ -221,7 +212,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 				}
 			}
 		}
-		cout<<"matched "<<nmatched<<" clusters"<<endl;
+//		cout<<"matched "<<nmatched<<" clusters"<<endl;
 		//remove unmatched clusters
 		int iFit=0;
 		for(auto it=tpcFits.begin(); it!=tpcFits.end();) {
@@ -253,11 +244,11 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			gPad->Update();
 
 //			if( telescopeFitter.processDrawSignals()  ) break;
-/*
 			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
 			mimosaCanv->cd();
 			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
 
+			/*
 			DetectorConfiguration combinedSetup{
 					2, {-350,200 }, //nplanes, planeposition
 					0.001, int(1000*mimosa.xmax()), int(1000*mimosa.ymax()) //pixelsize, xpixels, ypixels
@@ -318,6 +309,8 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		outputFile->cd();
 		fitResultTree.Write();
 		timeDifference.Write();
+		dxzAveragePosition.Write();
+		dyzAveragePosition.Write();
 		outputFile->Close();
 	}
 

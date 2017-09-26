@@ -40,8 +40,8 @@ public:
 	struct PlaneHistograms {
 		static int n;
 		PlaneHistograms(const DetectorConfiguration& det) :
-			xResidual( ("xResidual_"+std::to_string(n)).c_str(), ("xResidual_"+std::to_string(n)).c_str(), 40, -0.4, 0.4),
-			yResidual( ("yResidual_"+std::to_string(n)).c_str(), ("yResidual_"+std::to_string(n)).c_str(), 40, -0.4, 0.4),
+			xResidual( ("xResidual_"+std::to_string(n)).c_str(), ("xResidual_"+std::to_string(n)).c_str(), 40, -0.1, 0.1),
+			yResidual( ("yResidual_"+std::to_string(n)).c_str(), ("yResidual_"+std::to_string(n)).c_str(), 40, -0.1, 0.1),
 			zRotation( ("zRotation_"+std::to_string(n)).c_str(), ("zRotation_"+std::to_string(n)).c_str(), 40, -0.05, 0.05),
 			xResidualByPixel( ("xResidualByPixel_"+std::to_string(n)).c_str(), ("xResidualByPixel_"+std::to_string(n)).c_str(), 20, det.xmin(), det.xmax(), 20, 0, det.ymax() ),
 			yResidualByPixel( ("yResidualByPixel_"+std::to_string(n)).c_str(), ("yResidualByPixel_"+std::to_string(n)).c_str(), 20, det.xmin(), det.xmax(), 20, 0, det.ymax() ),

@@ -32,7 +32,7 @@ struct FitResult2D {
 };
 
 struct FitResult3D {
-	FitResult3D(FitResult2D XZ, FitResult2D YZ) : XZ(XZ), YZ(YZ) {}
+	FitResult3D(FitResult2D XZ, FitResult2D YZ) : XZ(XZ), YZ(YZ) {};
 
 	FitResult2D XZ, YZ;
 };
