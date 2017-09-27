@@ -272,9 +272,9 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 	}
 
 	gStyle->SetMarkerStyle(20);
-	pointTree.Draw("h.z:h.y:h.x:h.ToT", "", "*");
+	pointTree.Draw("h.x:h.y:h.z:h.ToT", "", "*");
 	TH1* axisObject= dynamic_cast<TH1*>( gPad->GetPrimitive("htemp") );
-	axisObject->GetXaxis()->SetLimits(detector.xmin(),detector.xmax());
+	axisObject->GetZaxis()->SetLimits(detector.xmin(),detector.xmax());
 	axisObject->GetYaxis()->SetLimits(detector.ymin(),detector.ymax());
 	axisObject->DrawClone();
 	gPad->Update();

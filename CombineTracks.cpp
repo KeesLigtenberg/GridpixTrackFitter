@@ -98,7 +98,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 	int nTelescopeTriggers=0,previousTriggerNumberBegin=0, previous2TriggerNumberBegin=0;
 	for(int i=0,j=0;
-//			i<20
+			i<100000
 			;i++) {
 
 		// Get Entry and match trigger Numbers
@@ -106,12 +106,19 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		if( !telescopeFitter.getEntry(i) ) break;
 
+		if(i>71000 && !(i%10000) ) {
+			cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
+			cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
+			cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber+triggerOffset) % 32768<<" in entry "<<j<<endl;
+//			if(cin.get()=='q') break;
+		}
+
 		//if previous frame did not increase and this frame did not increase, there is no related trigger to this frame
 
 
 		//if triggerNumberBegin decreased, we must get entries until the tpc triggernumber also decreases
 		if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin)
-			while( (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin && tpcFitter.getEntry(j++) ) {};
+			while( tpcFitter.getEntry(j++) && (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin ) {};
 
 		//get next entry until tpc trigger number is larger than or equal to begin
 		while( (tpcFitter.triggerNumber+triggerOffset) % 32768 <telescopeFitter.triggerNumberBegin && tpcFitter.getEntry(j++) ) {};
@@ -119,9 +126,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		//if also larger than end, continue;
 		if( (tpcFitter.triggerNumber+triggerOffset) % 32768 > telescopeFitter.triggerNumberEnd) { triggerStatus.Fill("Trigger numbers do not match", 1); continue;}
 
-		cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
-		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
-		cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber+triggerOffset) % 32768<<" in entry "<<j<<endl;
+
 
 		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
 			nTelescopeTriggers++;
@@ -159,8 +164,9 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
 //			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
-			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
-			h.SetPosition(h.getPosition() + TVector3(6+0.62,14-0.0543605,timepixZCenter) );
+			h.RotatePosition(0.283518, {0,-7,6}, {1,0,0});
+//			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
+			h.SetPosition(h.getPosition() + TVector3(11-4.43995,14-0.0543605-0.0383354,timepixZCenter) );
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters ) {
@@ -174,6 +180,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		if(tpcFits.empty()) { triggerStatus.Fill("All tpc clusters failed fit", 1); continue; }
 
 //		cout<<"timepix passed!"<<endl;
+
 
 		//match fits and clusters
 		tpcResiduals.clear();
@@ -212,28 +219,31 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		}
 //		cout<<"matched "<<nmatched<<" clusters"<<endl;
 		//remove unmatched clusters
-		int iFit=0;
-		for(auto it=tpcFits.begin(); it!=tpcFits.end();) {
-			if(!tpcFitIsMatched[iFit++]) {
-				it=tpcFits.erase(it);
-			} else {
-				++it;
+		bool removeUnmatched=false;
+		if(removeUnmatched) {
+			int iFit=0;
+			for(auto it=tpcFits.begin(); it!=tpcFits.end();) {
+				if(!tpcFitIsMatched[iFit++]) {
+					it=tpcFits.erase(it);
+				} else {
+					++it;
+				}
 			}
-		}
-		int jFit=0;
-		for(auto it=telescopeFits.begin(); it!=telescopeFits.end();) {
-			if(!telescopeFitIsMatched[jFit++]) {
-				it=telescopeFits.erase(it);
-			} else {
-				++it;
+			int jFit=0;
+			for(auto it=telescopeFits.begin(); it!=telescopeFits.end();) {
+				if(!telescopeFitIsMatched[jFit++]) {
+					it=telescopeFits.erase(it);
+				} else {
+					++it;
+				}
 			}
-		}
 
-		if( telescopeFits.empty() || tpcFits.empty() ) {
-			triggerStatus.Fill("Telescope and tpc fits do not match", 1);
-			continue;
-		} else {
-			triggerStatus.Fill("Successful", 1);
+			if( telescopeFits.empty() || tpcFits.empty() ) {
+				triggerStatus.Fill("Telescope and tpc fits do not match", 1);
+				continue;
+			} else {
+				triggerStatus.Fill("Successful", 1);
+			}
 		}
 
 		//display event
@@ -249,9 +259,9 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			gPad->Update();
 
 //			if( telescopeFitter.processDrawSignals()  ) break;
-			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
-			mimosaCanv->cd();
-			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
+//			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
+//			mimosaCanv->cd();
+//			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
 
 			/*
 			DetectorConfiguration combinedSetup{
@@ -279,6 +289,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			if( telescopeFitter.processDrawSignals()  ) break;
 		}
 //		displayEvent=false;
+
 
 		tpcClusterSize.clear();
 		for(unsigned iClust=0; iClust<tpcFittedClusters.size(); ++iClust) {

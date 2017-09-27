@@ -197,21 +197,21 @@ void TrackCombiner::processTracks() {
 		}
 
 		//display event
-		if( displayEvent ) {
+		if( displayEvent && dxz < 0.1 && dyz <0.1 ) {
 
 			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
 			timepixCanv->cd();
-			tpcFitter.drawEvent(tpcHits, tpcFits);
+			tpcFitter.drawEvent(tpcHits, {} );
 			for (auto& f : telescopeFits)
 				f.draw(tpcDetector.zmin()+timepixZCenter, tpcDetector.zmax()+timepixZCenter);
-			for (auto& f : tpcFits)
-				f.draw( tpcDetector.zmin()+timepixZCenter, tpcDetector.zmin()+timepixZCenter );
+//			for (auto& f : tpcFits)
+//				f.draw( tpcDetector.zmin()+timepixZCenter, tpcDetector.zmin()+timepixZCenter );
 			gPad->Update();
 
 //			if( telescopeFitter.processDrawSignals()  ) break;
-			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
-			mimosaCanv->cd();
-			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
+//			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
+//			mimosaCanv->cd();
+//			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
 
 			/*
 			DetectorConfiguration combinedSetup{
