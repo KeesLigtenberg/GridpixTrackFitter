@@ -11,6 +11,8 @@
 #include "TH2.h"
 #include "TPad.h"
 #include "TCanvas.h"
+#include "TView.h"
+#include "TLegend.h"
 
 #include "PositionHit.h"
 #include "Hit.h"
@@ -272,12 +274,35 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 	}
 
 	gStyle->SetMarkerStyle(20);
+	gStyle->SetOptTitle(0);
 	pointTree.Draw("h.x:h.y:h.z:h.ToT", "", "*");
 	TH1* axisObject= dynamic_cast<TH1*>( gPad->GetPrimitive("htemp") );
-	axisObject->GetZaxis()->SetLimits(detector.xmin(),detector.xmax());
-	axisObject->GetYaxis()->SetLimits(detector.ymin(),detector.ymax());
-	axisObject->DrawClone();
+	auto zaxis=axisObject->GetZaxis();
+	zaxis->SetLimits(detector.xmin(),detector.xmax());
+	zaxis->SetTitle("pixel z-axis (drift direction) [mm]") ;
+	auto yaxis=axisObject->GetYaxis();
+	yaxis->SetTitle("pixel y-axis [mm]");
+	yaxis->SetLimits(detector.ymin(),detector.ymax());
+	auto xaxis=axisObject->GetXaxis();
+	xaxis->SetLimits(detector.zmin(),detector.zmax());
+	xaxis->SetTitle("pixel x-axis (beam direction) [mm]");
+	for(auto axis : {xaxis, yaxis} )
+		axis->SetTitleOffset(1.6);
+	axisObject->Draw();
+	double theta=70,phi=60;
+//	std::cout<<"give angles!"<<std::endl;
+//	std::cin>>theta>>phi;
 	gPad->Update();
+	gPad->GetView()->RotateView(theta, phi);
+
+	TLegend* legend= new TLegend( 0.6, 0.8, 0.95,0.95 );
+	legend->SetName("eventDisplayLegend");
+	legend->AddEntry(axisObject, "Timepix hits (ToT)", "p");
+	legend->AddEntry(axisObject, "Telescope track", "l");
+	legend->Draw();
+
+	gPad->Update();
+
 }
 
 //timepix HoughTransform

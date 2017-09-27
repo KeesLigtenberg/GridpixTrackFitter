@@ -37,11 +37,12 @@ struct TimePixDetectorConfiguration : DetectorConfiguration {
 		0.055, 256, 256 //pixelsize, xpixels, ypixels
 	} {};
 	virtual double xmin() const {return driftSpeed; }
-	virtual double xmax() const {return 400*driftSpeed; }
+	virtual double xmax() const {return 225*driftSpeed; }
 	virtual double zmin() const {return 0; }
-	virtual double zmax() const {return 256*pixelsize; };
+	virtual double zmax() const {return pixelColumns*pixelsize; };
 } timePixChip;
-const double timepixZCenter=-374;
+const double timepixZCenter=-374, timepixXAngle=0.283518;
+const TVector3 timepixShift(11-4.43995,14-0.0543605-0.0383354,timepixZCenter);
 
 const DetectorConfiguration mimosa= {
 	6, //planes
@@ -161,12 +162,13 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		if( !tpcFitter.passEvent(tpcHits) ) { triggerStatus.Fill("Less than 20 hits in tpc", 1); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
 		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
+		auto tpcHistInTimePixFrame=tpcHits;//save hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
 //			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
-			h.RotatePosition(0.283518, {0,-7,6}, {1,0,0});
+			h.RotatePosition(timepixXAngle, {0,-7,6}, {1,0,0});
 //			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
-			h.SetPosition(h.getPosition() + TVector3(11-4.43995,14-0.0543605-0.0383354,timepixZCenter) );
+			h.SetPosition(h.getPosition() + timepixShift);
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters ) {
@@ -251,9 +253,12 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
 			timepixCanv->cd();
-			tpcFitter.drawEvent(tpcHits, {});
-			for (auto& f : telescopeFits)
-				f.draw(timePixChip.zmin()+timepixZCenter, timePixChip.zmax()+timepixZCenter);
+			vector<SimpleFitResult> telescopeFitsInTimePixFrame;
+			for(auto& f : telescopeFits)
+				telescopeFitsInTimePixFrame.push_back( f.makeShifted(-timepixShift).makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0}).makeMirrorY() ); //
+			tpcFitter.drawEvent(tpcHistInTimePixFrame, telescopeFitsInTimePixFrame);
+//			for (auto& f : telescopeFits)
+//				f.draw(timePixChip.zmin()+timepixZCenter, timePixChip.zmax()+timepixZCenter);
 //			for (auto& f : tpcFits)
 //				f.draw( timePixChip.zmin()+timepixZCenter, timePixChip.zmin()+timepixZCenter );
 			gPad->Update();

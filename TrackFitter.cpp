@@ -345,7 +345,7 @@ bool trackFitter::processDrawSignals() {
 		return true;
 	} else if (signal == 'w') {
 		//rotate and write as animated gif!
-		double phiView = 40;
+		double phiView = 55;
 		for (int thetaView = 0; thetaView < 360; thetaView += 2) {
 			gPad->GetView()->RotateView(thetaView, phiView);
 			gPad->Modified();

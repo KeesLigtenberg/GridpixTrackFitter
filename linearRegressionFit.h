@@ -54,6 +54,37 @@ struct SimpleFitResult {
 	}
 	double xAt(double z) const { return slope1*z+intersept1; };
 	double yAt(double z) const { return slope2*z+intersept2; };
+	SimpleFitResult makeShifted( const TVector3& shift ) {
+		return SimpleFitResult{
+			slope1, intersept1-slope1*shift.z()+shift.x(),
+			slope2, intersept2-slope2*shift.z()+shift.y(),
+			dslope1, dintersept1, //todo: propagate errors!
+			dslope2, dintersept2 //todo:propagate errors!
+		};
+	}
+	SimpleFitResult makeRotated(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis ) {
+		TVector3 slope(slope1, slope2, 1), intercept(intersept1, intersept2, 0);
+		slope.Rotate(rotation, rotationAxis);
+		for(TVector3* v : {&intercept} ) {
+			*v-=rotationPoint;
+			v->Rotate(rotation, rotationAxis);
+			*v+=rotationPoint;
+		}
+		return SimpleFitResult{
+			slope.x()/slope.z(),
+			intercept.z()*slope.x()/slope.z()+intercept.x(),
+			slope.y()/slope.z(),
+			intercept.z()*slope.y()/slope.z()+intercept.y(),
+			dslope1, dintersept1, //todo: propagate errors!
+			dslope2, dintersept2 //todo:propagate errors!
+		};
+	}
+	SimpleFitResult makeMirrorY() {
+		return SimpleFitResult {
+			slope1, intersept1, -slope2, -intersept2,
+			dslope1, dintersept1, dslope2, dintersept2
+		};
+	}
 };
 
 //root dictionary for use in TTree
