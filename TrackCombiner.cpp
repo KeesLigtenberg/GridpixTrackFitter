@@ -21,6 +21,7 @@ TrackCombiner::TrackCombiner(std::string mimosaInput, std::string timepixInput, 
 	telescopeFitter.makeMask(5e3);
 	telescopeFitter.setShifts( savedShifts ); //xy shift of planes
 	telescopeFitter.setAngles( savedAngles ); //planes rotation along rz-axis in xy plane
+	telescopeFitter.setCentres( savedCOM );
 //	telescopeFitter.setSlopes( savedSlopes ); //slope along rz, undone later by rotation of all hits
 
 	tpcFitter.makeMask(1e3);
@@ -58,7 +59,7 @@ void TrackCombiner::openFile(std::string filename) {
 void TrackCombiner::processTracks() {
 	int nTelescopeTriggers=0,previousTriggerNumberBegin=0, previous2TriggerNumberBegin=0;
 	for(int i=0,j=0;
-//			i<20
+//			i<100000
 			;i++) {
 
 		// Get Entry and match trigger Numbers
@@ -66,12 +67,19 @@ void TrackCombiner::processTracks() {
 		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		if( !telescopeFitter.getEntry(i) ) break;
 
+		if(i && !(i%10000) ) {
+			cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
+			cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
+			cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber+triggerOffset) % 32768<<" in entry "<<j<<endl;
+//			if(cin.get()=='q') break;
+		}
+
 		//if previous frame did not increase and this frame did not increase, there is no related trigger to this frame
 
 
 		//if triggerNumberBegin decreased, we must get entries until the tpc triggernumber also decreases
 		if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin)
-			while( (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin && tpcFitter.getEntry(j++) ) {};
+			while( tpcFitter.getEntry(j++) && (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin ) {};
 
 		//get next entry until tpc trigger number is larger than or equal to begin
 		while( (tpcFitter.triggerNumber+triggerOffset) % 32768 <telescopeFitter.triggerNumberBegin && tpcFitter.getEntry(j++) ) {};
@@ -79,9 +87,7 @@ void TrackCombiner::processTracks() {
 		//if also larger than end, continue;
 		if( (tpcFitter.triggerNumber+triggerOffset) % 32768 > telescopeFitter.triggerNumberEnd) { triggerStatus.Fill("Trigger numbers do not match", 1); continue;}
 
-		cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
-		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
-		cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber+triggerOffset) % 32768<<" in entry "<<j<<endl;
+
 
 		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
 			nTelescopeTriggers++;
@@ -95,8 +101,8 @@ void TrackCombiner::processTracks() {
 		if( !telescopeFitter.passEvent(telescopeHits) ) { triggerStatus.Fill("Less than 4 planes hit in telescope", 1); continue;} //minimal 4 planes!
 		telescopeHits=telescopeFitter.rotateAndShift(telescopeHits);
 		for(auto&v:telescopeHits) for(auto&h:v) {
-			h.RotatePosition(-savedSlopes.first, {telescope.getCentre().first,telescope.getCentre().second,0}, {0,1,0} );
-			h.RotatePosition(savedSlopes.second, {telescope.getCentre().first,telescope.getCentre().second,0}, {1,0,0} );
+			h.RotatePosition(-savedSlopes.first, {mimosa.getCentre().first,mimosa.getCentre().second,0}, {0,1,0} );
+			h.RotatePosition(savedSlopes.second, {mimosa.getCentre().first,mimosa.getCentre().second,0}, {1,0,0} );
 		}
 		auto telescopeClusters = telescopeFitter.houghTransform(telescopeHits);
 		for( auto& cluster : telescopeClusters) {
@@ -116,11 +122,13 @@ void TrackCombiner::processTracks() {
 		if( !tpcFitter.passEvent(tpcHits) ) { triggerStatus.Fill("Less than 20 hits in tpc", 1); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
 		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
+		auto tpcHistInTimePixFrame=tpcHits;//save hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
-//			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
-			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
-			h.SetPosition(h.getPosition() + TVector3(6+0.62,14-0.0543605,timepixZCenter) );
+			h.RotatePosition(timepixYAngle, {11,0,6}, {0,1,0});
+			h.RotatePosition(timepixXAngle, {0,-7,6}, {1,0,0});
+//			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
+			h.SetPosition(h.getPosition() + timepixShift);
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters ) {
@@ -135,6 +143,7 @@ void TrackCombiner::processTracks() {
 
 //		cout<<"timepix passed!"<<endl;
 
+
 		//match fits and clusters
 		tpcResiduals.clear();
 		int nmatched=0;
@@ -144,16 +153,17 @@ void TrackCombiner::processTracks() {
 			for(unsigned jFit=0; jFit<telescopeFits.size(); jFit++) {
 				const auto& telescopeFit = telescopeFits[jFit];
 				//should we use the actual errors of the fit here?
-				if( fabs( tpcFit.xAt(timepixZCenter)-telescopeFit.xAt(timepixZCenter) ) < 1.5
-					&& fabs( tpcFit.yAt(timepixZCenter)-telescopeFit.yAt(timepixZCenter) ) < 1.5  ) {
+				if( fabs( tpcFit.xAt(timepixShift.z())-telescopeFit.xAt(timepixShift.z()) ) < 1.5
+					&& fabs( tpcFit.yAt(timepixShift.z())-telescopeFit.yAt(timepixShift.z()) ) < 1.5  ) {
 
-					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
+//					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
-					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), telescopeFit);
+					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), tpcFit);
 					//rotate back to frame of timepix
 					for(auto& r:residuals) {
 						auto v=r.getVector();
-						v.Rotate(-0.29, {1,0,0});
+						v.Rotate(-timepixXAngle, {1,0,0});
+						v.Rotate(-timepixYAngle, {0,1,0});
 						r.setVector(v);
 					}
 //					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
@@ -172,40 +182,46 @@ void TrackCombiner::processTracks() {
 		}
 //		cout<<"matched "<<nmatched<<" clusters"<<endl;
 		//remove unmatched clusters
-		int iFit=0;
-		for(auto it=tpcFits.begin(); it!=tpcFits.end();) {
-			if(!tpcFitIsMatched[iFit++]) {
-				it=tpcFits.erase(it);
-			} else {
-				++it;
+		bool removeUnmatched=true;
+		if(removeUnmatched) {
+			int iFit=0;
+			for(auto it=tpcFits.begin(); it!=tpcFits.end();) {
+				if(!tpcFitIsMatched[iFit++]) {
+					it=tpcFits.erase(it);
+				} else {
+					++it;
+				}
 			}
-		}
-		int jFit=0;
-		for(auto it=telescopeFits.begin(); it!=telescopeFits.end();) {
-			if(!telescopeFitIsMatched[jFit++]) {
-				it=telescopeFits.erase(it);
-			} else {
-				++it;
+			int jFit=0;
+			for(auto it=telescopeFits.begin(); it!=telescopeFits.end();) {
+				if(!telescopeFitIsMatched[jFit++]) {
+					it=telescopeFits.erase(it);
+				} else {
+					++it;
+				}
 			}
-		}
 
-		if( telescopeFits.empty() || tpcFits.empty() ) {
-			triggerStatus.Fill("Telescope and tpc fits do not match", 1);
-			continue;
-		} else {
-			triggerStatus.Fill("Successful", 1);
+			if( telescopeFits.empty() || tpcFits.empty() ) {
+				triggerStatus.Fill("Telescope and tpc fits do not match", 1);
+				continue;
+			} else {
+				triggerStatus.Fill("Successful", 1);
+			}
 		}
 
 		//display event
-		if( displayEvent && dxz < 0.1 && dyz <0.1 ) {
+		if( displayEvent ) {
 
 			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
 			timepixCanv->cd();
-			tpcFitter.drawEvent(tpcHits, {} );
-			for (auto& f : telescopeFits)
-				f.draw(tpcDetector.zmin()+timepixZCenter, tpcDetector.zmax()+timepixZCenter);
+			vector<SimpleFitResult> telescopeFitsInTimePixFrame;
+			for(auto& f : telescopeFits)
+				telescopeFitsInTimePixFrame.push_back( f.makeShifted(-timepixShift).makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0}).makeMirrorY() ); //
+			tpcFitter.drawEvent(tpcHistInTimePixFrame, telescopeFitsInTimePixFrame);
+//			for (auto& f : telescopeFits)
+//				f.draw(timePixChip.zmin()+timepixShift.z(), timePixChip.zmax()+timepixShift.z());
 //			for (auto& f : tpcFits)
-//				f.draw( tpcDetector.zmin()+timepixZCenter, tpcDetector.zmin()+timepixZCenter );
+//				f.draw( timePixChip.zmin()+timepixShift.z(), timePixChip.zmin()+timepixShift.z() );
 			gPad->Update();
 
 //			if( telescopeFitter.processDrawSignals()  ) break;
@@ -240,6 +256,7 @@ void TrackCombiner::processTracks() {
 		}
 //		displayEvent=false;
 
+
 		tpcClusterSize.clear();
 		for(unsigned iClust=0; iClust<tpcFittedClusters.size(); ++iClust) {
 			if(tpcFitIsMatched[iClust])	tpcClusterSize.push_back( tpcFittedClusters[iClust]->size());//count cluster size of only fitted clusters
@@ -251,7 +268,6 @@ void TrackCombiner::processTracks() {
 
 		double telescopeSeconds=telescopeFitter.timestamp/40.E6, tpcSeconds=tpcFitter.timestamp/4096.*25E-9;
 		static double firstTimeDifference=telescopeSeconds-tpcSeconds;
-//		timeDifference.Fill( telescopeSeconds-tpcSeconds-firstTimeDifference );
 
 	}
 
