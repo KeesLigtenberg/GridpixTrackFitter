@@ -87,7 +87,7 @@ private:
 	double slope1FromSum, slope2FromSum;
 
 //friend function!
-	friend double CombineTracks(std::string mimosaInput, std::string timepixInput,int offset, bool displayEvent);
+	friend class TrackCombiner;
 };
 
 #endif /* TimePixFitter_H_ */

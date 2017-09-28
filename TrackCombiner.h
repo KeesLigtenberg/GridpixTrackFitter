@@ -32,27 +32,6 @@
 #include "mimosaAlignment.h"
 #include "relativeAlignment.h"
 
-struct TimePixDetectorConfiguration : DetectorConfiguration {
-	static constexpr double driftSpeed=0.075; //mm/ns
-	TimePixDetectorConfiguration() : DetectorConfiguration{
-		1, {0}, //nplanes, planeposition
-		0.055, 256, 256 //pixelsize, xpixels, ypixels
-	} {};
-	virtual double xmin() const {return driftSpeed; }
-	virtual double xmax() const {return 400*driftSpeed; }
-	virtual double zmin() const {return 0; }
-	virtual double zmax() const {return 256*pixelsize; };
-} timePixChip;
-const double timepixZCenter=-374;
-
-const DetectorConfiguration mimosa= {
-	6, //planes
-//	{0, 18.6, 37.4, 116.7, 151.1, 188.4}, //plane position from Wolf thesis
-	{0, 15.8, 31.8, 143.1, 161.55, 179.91 }, //plane positions as measured
-	0.0184, //pixelsize in mm
-	1153, 577 //row, column, ://one extra because exampleData starts at 1 and our data starts at 0 //TODO: change this to one or the other! e.g -1 for our data!
-};
-
 class TrackCombiner {
 public:
 	TrackCombiner(std::string mimosaInput, std::string timepixInput, const DetectorConfiguration& telescope=mimosa, const DetectorConfiguration& tpc=timePixChip);
@@ -78,7 +57,7 @@ private:
 	int triggerOffset=-1;
 	bool displayEvent=false;
 
-	std::unique_ptr<TFile> outputFile{};
+	std::unique_ptr<TFile, std::function<void(TFile*)> > outputFile{nullptr, [](TFile* f) { f->Close(); delete f;} };
 	TTree fitResultTree{ "fitResults", "Tree with telescope and timepix fit results"};
 
 	//for tree

@@ -35,7 +35,7 @@ TrackCombiner::~TrackCombiner() {
 		outputFile->cd();
 		fitResultTree.Write();
 		triggerStatus.Write();
-		outputFile->Close();
+//		outputFile->Close(); taken care of in custom uniqueptr destructor
 	}
 }
 
@@ -51,9 +51,8 @@ void TrackCombiner::setTreeBranches() {
 }
 
 void TrackCombiner::openFile(std::string filename) {
-	outputFile(
-			new TFile(filename.c_str(), "RECREATE"),
-			[](TFile* f) { f->Close(); delete f;} ) ;
+	outputFile.reset(new TFile(filename.c_str(), "RECREATE"));
+	fitResultTree.SetDirectory(outputFile.get());
 }
 
 void TrackCombiner::processTracks() {
