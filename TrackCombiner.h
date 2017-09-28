@@ -28,7 +28,9 @@
 #include "ResidualHistogrammer.cpp"
 #endif
 
+#include "testBeamSetup.h"
 #include "mimosaAlignment.h"
+#include "relativeAlignment.h"
 
 struct TimePixDetectorConfiguration : DetectorConfiguration {
 	static constexpr double driftSpeed=0.075; //mm/ns

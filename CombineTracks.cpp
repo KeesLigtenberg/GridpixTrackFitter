@@ -26,31 +26,11 @@
 #include "ResidualHistogrammer.cpp"
 #endif
 
+#include "testBeamSetup.h"
 #include "mimosaAlignment.h"
+#include "relativeAlignment.h"
 
 using namespace std;
-
-struct TimePixDetectorConfiguration : DetectorConfiguration {
-	static constexpr double driftSpeed=0.075; //mm/ns
-	TimePixDetectorConfiguration() : DetectorConfiguration{
-		1, {0}, //nplanes, planeposition
-		0.055, 256, 256 //pixelsize, xpixels, ypixels
-	} {};
-	virtual double xmin() const {return driftSpeed; }
-	virtual double xmax() const {return 225*driftSpeed; }
-	virtual double zmin() const {return 0; }
-	virtual double zmax() const {return pixelColumns*pixelsize; };
-} timePixChip;
-const double timepixZCenter=-374, timepixXAngle=0.283518;
-const TVector3 timepixShift(11-4.43995,14-0.0543605-0.0383354,timepixZCenter);
-
-const DetectorConfiguration mimosa= {
-	6, //planes
-//	{0, 18.6, 37.4, 116.7, 151.1, 188.4}, //plane position from Wolf thesis
-	{0, 15.8, 31.8, 143.1, 161.55, 179.91 }, //plane positions as measured
-	0.0184, //pixelsize in mm
-	1153, 577 //row, column, ://one extra because exampleData starts at 1 and our data starts at 0 //TODO: change this to one or the other!
-};
 
 //returns correlation factor
 double CombineTracks(std::string mimosaInput, std::string timepixInput, int triggerOffset=0,  bool displayEvent=false) {
@@ -99,7 +79,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 	int nTelescopeTriggers=0,previousTriggerNumberBegin=0, previous2TriggerNumberBegin=0;
 	for(int i=0,j=0;
-			i<100000
+//			i<100000
 			;i++) {
 
 		// Get Entry and match trigger Numbers
@@ -165,7 +145,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		auto tpcHistInTimePixFrame=tpcHits;//save hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
-//			h.RotatePosition(-0.0, {0,0,10}, {0,1,0});
+			h.RotatePosition(timepixYAngle, {11,0,6}, {0,1,0});
 			h.RotatePosition(timepixXAngle, {0,-7,6}, {1,0,0});
 //			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
 			h.SetPosition(h.getPosition() + timepixShift);
@@ -193,16 +173,17 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 			for(unsigned jFit=0; jFit<telescopeFits.size(); jFit++) {
 				const auto& telescopeFit = telescopeFits[jFit];
 				//should we use the actual errors of the fit here?
-				if( fabs( tpcFit.xAt(timepixZCenter)-telescopeFit.xAt(timepixZCenter) ) < 1.5
-				    && fabs( tpcFit.yAt(timepixZCenter)-telescopeFit.yAt(timepixZCenter) ) < 1.5  ) {
+				if( fabs( tpcFit.xAt(timepixShift.z())-telescopeFit.xAt(timepixShift.z()) ) < 1.5
+				    && fabs( tpcFit.yAt(timepixShift.z())-telescopeFit.yAt(timepixShift.z()) ) < 1.5  ) {
 
-					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
+//					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
-					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), telescopeFit);
+					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), tpcFit);
 					//rotate back to frame of timepix
 					for(auto& r:residuals) {
 						auto v=r.getVector();
-						v.Rotate(-0.29, {1,0,0});
+						v.Rotate(-timepixXAngle, {1,0,0});
+						v.Rotate(-timepixYAngle, {0,1,0});
 						r.setVector(v);
 					}
 //					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
@@ -221,7 +202,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		}
 //		cout<<"matched "<<nmatched<<" clusters"<<endl;
 		//remove unmatched clusters
-		bool removeUnmatched=false;
+		bool removeUnmatched=true;
 		if(removeUnmatched) {
 			int iFit=0;
 			for(auto it=tpcFits.begin(); it!=tpcFits.end();) {
@@ -258,9 +239,9 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 				telescopeFitsInTimePixFrame.push_back( f.makeShifted(-timepixShift).makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0}).makeMirrorY() ); //
 			tpcFitter.drawEvent(tpcHistInTimePixFrame, telescopeFitsInTimePixFrame);
 //			for (auto& f : telescopeFits)
-//				f.draw(timePixChip.zmin()+timepixZCenter, timePixChip.zmax()+timepixZCenter);
+//				f.draw(timePixChip.zmin()+timepixShift.z(), timePixChip.zmax()+timepixShift.z());
 //			for (auto& f : tpcFits)
-//				f.draw( timePixChip.zmin()+timepixZCenter, timePixChip.zmin()+timepixZCenter );
+//				f.draw( timePixChip.zmin()+timepixShift.z(), timePixChip.zmin()+timepixShift.z() );
 			gPad->Update();
 
 //			if( telescopeFitter.processDrawSignals()  ) break;
