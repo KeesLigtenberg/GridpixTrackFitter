@@ -253,7 +253,7 @@ void trackFitter::fitTracks(std::string outputfilename) {
 
 }
 
-std::vector<std::pair<double, double> > trackFitter::getMeans() {
+std::vector<std::pair<double, double> > trackFitter::getMeanResiduals() {
 //	auto means= residualHistograms->getMeansOfPlanes();
 	auto means= averageResidualFromSum;
 	for(auto& m : means ) cout<<"shift ("<<m.first<<", "<<m.second<<")"<<endl;
@@ -330,6 +330,11 @@ void trackFitter::saveAlignment(std::string outputfile) {
 		fout<< (*r) ;
 		fout<< ( ++r==angles.end() ? " };\n" : ", " );
 	}
+	fout<<"std::vector<std::pair<double,double>> savedCOM={";
+	for(auto r=hitsCentre.begin(); r!=hitsCentre.end();) {
+		fout<<"{"<< r->first<<", "<<r->second<<"}"  ;
+		fout<< ( ++r==hitsCentre.end() ? " };\n" : ", " );
+	}
 	fout<<"std::pair<double,double> savedSlopes= {"<<houghTransform.angleOfTracksX<<", "<<houghTransform.angleOfTracksY<<"};"<<endl;
 	fout<<endl;
 }
@@ -358,3 +363,7 @@ bool trackFitter::processDrawSignals() {
 	return false;
 }
 
+void trackFitter::setCentres(
+		const std::vector<std::pair<double, double> >& COMs) {
+	hitsCentre=COMs;
+}

@@ -65,7 +65,7 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 				//fit tracks!
 				telescopeFitter.fitTracks("residualHistograms"+to_string(i)+".root");
 
-				auto means=telescopeFitter.getMeans();
+				auto means=telescopeFitter.getMeanResiduals();
 				auto rotations=telescopeFitter.getRotations();
 
 				means[1]=means[4]={0,0};

@@ -42,6 +42,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 	telescopeFitter.setShifts( savedShifts ); //xy shift of planes
 	telescopeFitter.setAngles( savedAngles ); //planes rotation along rz-axis in xy plane
+	telescopeFitter.setCentres( savedCOM );
 //	telescopeFitter.setSlopes( savedSlopes ); //slope along rz, undone later by rotation of all hits
 
 
@@ -87,7 +88,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		if( !telescopeFitter.getEntry(i) ) break;
 
-		if(i>71000 && !(i%10000) ) {
+		if(i && !(i%10000) ) {
 			cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
 			cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
 			cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber+triggerOffset) % 32768<<" in entry "<<j<<endl;
@@ -178,7 +179,7 @@ double CombineTracks(std::string mimosaInput, std::string timepixInput, int trig
 
 //					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
-					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), tpcFit);
+					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), telescopeFit);
 					//rotate back to frame of timepix
 					for(auto& r:residuals) {
 						auto v=r.getVector();

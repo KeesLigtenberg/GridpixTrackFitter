@@ -30,7 +30,7 @@ public:
 	int makeMask(double ntimesThreshold=1e4);
 	void fitTracks( std::string outputfilename );
 
-	std::vector<std::pair<double,double>> getMeans(); //not constant because adds fits!
+	std::vector<std::pair<double,double>> getMeanResiduals(); //not constant because adds fits!
 	const std::vector<std::pair<double,double>>& getShifts() const;
 	std::vector<double> getRotations(); //not constant because adds fits!
 	const std::vector<double>& getAngles() const;
@@ -41,6 +41,7 @@ public:
 	void setAngles( const std::vector<double>& angles);
 	void addToAngles( const std::vector<double>& angles);
 	void setSlopes( std::pair<double, double> slopes);
+	void setCentres( const std::vector<std::pair<double,double>>& COMs);
 	int getEntry(int iEvent);
 
 	void saveAlignment(std::string outputfile);
