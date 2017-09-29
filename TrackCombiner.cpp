@@ -56,41 +56,18 @@ void TrackCombiner::openFile(std::string filename) {
 }
 
 void TrackCombiner::processTracks() {
-	int nTelescopeTriggers=0,previousTriggerNumberBegin=0, previous2TriggerNumberBegin=0;
+	nTelescopeTriggers=0;
+	telescopeFitter.getEntry(0);
 	for(int i=0,j=0;
 //			i<100000
-			;i++) {
+			;) {
 
 		// Get Entry and match trigger Numbers
-		previous2TriggerNumberBegin=previousTriggerNumberBegin;
-		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
-		if( !telescopeFitter.getEntry(i) ) break;
-
-		if(i && !(i%10000) ) {
-			cout<<"entry: "<<i<<"/"<<telescopeFitter.nEvents<<" ";
-			cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
-			cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber+triggerOffset) % 32768<<" in entry "<<j<<endl;
-//			if(cin.get()=='q') break;
-		}
-
-		//if previous frame did not increase and this frame did not increase, there is no related trigger to this frame
-
-
-		//if triggerNumberBegin decreased, we must get entries until the tpc triggernumber also decreases
-		if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin)
-			while( tpcFitter.getEntry(j++) && (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin ) {};
-
-		//get next entry until tpc trigger number is larger than or equal to begin
-		while( (tpcFitter.triggerNumber+triggerOffset) % 32768 <telescopeFitter.triggerNumberBegin && tpcFitter.getEntry(j++) ) {};
-
-		//if also larger than end, continue;
-		if( (tpcFitter.triggerNumber+triggerOffset) % 32768 > telescopeFitter.triggerNumberEnd) { triggerStatus.Fill("Trigger numbers do not match", 1); continue;}
-
-
-
-		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
-			nTelescopeTriggers++;
-		}
+		auto matchStatus=getAndMatchEntries(i,j);
+		printTriggers(i,j);
+//		if( cin.get()=='q') break;
+		if( matchStatus == MatchResult::end ) break;
+		else if( matchStatus == MatchResult::noMatch) continue;
 
 		// Fit tracks
 
@@ -204,6 +181,7 @@ void TrackCombiner::processTracks() {
 				triggerStatus.Fill("Telescope and tpc fits do not match", 1);
 				continue;
 			} else {
+				cout<<"Success!"<<endl;
 				triggerStatus.Fill("Successful", 1);
 			}
 		}
@@ -217,43 +195,11 @@ void TrackCombiner::processTracks() {
 			for(auto& f : telescopeFits)
 				telescopeFitsInTimePixFrame.push_back( f.makeShifted(-timepixShift).makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0}).makeMirrorY() ); //
 			tpcFitter.drawEvent(tpcHistInTimePixFrame, telescopeFitsInTimePixFrame);
-//			for (auto& f : telescopeFits)
-//				f.draw(timePixChip.zmin()+timepixShift.z(), timePixChip.zmax()+timepixShift.z());
-//			for (auto& f : tpcFits)
-//				f.draw( timePixChip.zmin()+timepixShift.z(), timePixChip.zmin()+timepixShift.z() );
-			gPad->Update();
-
-//			if( telescopeFitter.processDrawSignals()  ) break;
-//			static TCanvas* mimosaCanv=new TCanvas("mimosa","Display of mimosa event", 600,400);
-//			mimosaCanv->cd();
-//			telescopeFitter.drawEvent( telescopeHits, telescopeFits );
-
-			/*
-			DetectorConfiguration combinedSetup{
-					2, {-350,200 }, //nplanes, planeposition
-					0.001, int(1000*mimosa.xmax()), int(1000*mimosa.ymax()) //pixelsize, xpixels, ypixels
-				};
-
-
-
-			std::vector<PositionHit> combinedHits;
-			for(auto& v: telescopeHits)
-				for(auto& h : v)
-					combinedHits.push_back(h);
-			for(auto& h: tpcHits) combinedHits.push_back(h);
-
-
-			HoughTransformer::drawCluster(combinedHits, combinedSetup);
-			for (auto& f : tpcFits)
-				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
-			for (auto& f : telescopeFits)
-				f.draw( combinedSetup.zmin(), combinedSetup.zmax() );
-//*/
 			gPad->Update();
 
 			if( telescopeFitter.processDrawSignals()  ) break;
+//			displayEvent=false;
 		}
-//		displayEvent=false;
 
 
 		tpcClusterSize.clear();
@@ -275,4 +221,59 @@ void TrackCombiner::processTracks() {
 
 	cout<<"entries in tree "<<fitResultTree.GetEntriesFast()<<endl;
 
+}
+
+TrackCombiner::MatchResult TrackCombiner::getAndMatchEntries(
+		int& telescopeEntry,
+		int& tpcStartEntry) {
+
+	//if previous frame did not increase and this frame did not increase, there is no related trigger to this frame
+//	if(previous2TriggerNumberBegin==telescopeFitter.triggerNumberEnd) { cout<<"unrelated!"<<endl; }
+//		triggerStatus.Fill("Unrelated telescope frame",1); return MatchResult::noMatch; }
+
+	//if triggerNumberBegin decreased, we must get entries until the tpc triggernumber also decreases
+	if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin)
+		do {
+			if( !tpcFitter.getEntry(tpcStartEntry++) ) return MatchResult::end;
+		} while ( (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin );
+
+	//get next entry until tpc trigger number is larger than or equal to begin
+	do {
+		if( !tpcFitter.getEntry(tpcStartEntry++) ) return MatchResult::end;
+	} while( (tpcFitter.triggerNumber+triggerOffset) % 32768 < telescopeFitter.triggerNumberBegin );
+
+	//if also larger than end: reached the end of this telescope frame, continue with next telescope frame;
+	if( (tpcFitter.triggerNumber+triggerOffset) % 32768 > telescopeFitter.triggerNumberEnd) {
+		triggerStatus.Fill("Trigger numbers do not match", 1);
+
+		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
+		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
+			nTelescopeTriggers++;
+		}
+		if( !telescopeFitter.getEntry(++telescopeEntry) ) return MatchResult::end;
+
+//		cout<<"increased telescopeEntry, first time pix match was: "<<timepixEntryFirstMatch<<endl;
+
+		tpcStartEntry=timepixEntryFirstMatch;
+		hadFirstMatch=false;
+
+		return MatchResult::noMatch;
+	}
+
+	if(not hadFirstMatch) {
+		timepixEntryFirstMatch=tpcStartEntry-1;
+		hadFirstMatch=true;
+	}
+
+	return MatchResult::match;
+
+}
+
+void TrackCombiner::printTriggers(int telescopeEntry, int tpcEntry) const {
+	const int printEveryN=1;
+	if( !(telescopeEntry%printEveryN) ) {
+		cout<<"entry: "<<telescopeEntry<<"/"<<telescopeFitter.nEvents<<" ";
+		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;
+		cout<<" timepix triggerNumber: "<<tpcFitter.triggerNumber<<"="<<(tpcFitter.triggerNumber+triggerOffset) % 32768<<" in entry "<<tpcEntry<<endl;
+	}
 }

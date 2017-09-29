@@ -47,6 +47,9 @@ public:
 
 private:
 	void setTreeBranches();
+	enum class MatchResult { match, noMatch, end };
+	MatchResult getAndMatchEntries(int& telescopeEntry, int& tpcStartEntry);
+	void printTriggers(int telescopeEntry, int tpcEntry) const;
 
 	const DetectorConfiguration& telescope;
 	const DetectorConfiguration& tpcDetector;
@@ -55,6 +58,11 @@ private:
 	TimePixFitter tpcFitter;
 
 	int triggerOffset=-1;
+	int previousTriggerNumberBegin=0;
+	bool hadFirstMatch=false;
+	int timepixEntryFirstMatch=0;
+//	int previous2TriggerNumberBegin=0;
+	int nTelescopeTriggers=0;
 	bool displayEvent=false;
 
 	std::unique_ptr<TFile, std::function<void(TFile*)> > outputFile{nullptr, [](TFile* f) { f->Close(); delete f;} };
