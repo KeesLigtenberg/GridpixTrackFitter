@@ -9,6 +9,7 @@
 #define TRACKCOMBINER_H_
 
 #include <string>
+#include <deque>
 
 #include "TTree.h"
 #include "TGraph.h"
@@ -64,17 +65,32 @@ private:
 //	int previous2TriggerNumberBegin=0;
 	int nTelescopeTriggers=0;
 	bool displayEvent=false;
+	std::deque<int> tpcEntryHasMatchingFit{};
 
 	std::unique_ptr<TFile, std::function<void(TFile*)> > outputFile{nullptr, [](TFile* f) { f->Close(); delete f;} };
 	TTree fitResultTree{ "fitResults", "Tree with telescope and timepix fit results"};
 
 	//for tree
+	struct TreeEntry {
+		vector<SimpleFitResult> telescopeFits{};
+		vector<SimpleFitResult> tpcFits{};
+		vector< vector<HitEntry> > tpcResiduals{};
+		vector<int> tpcClusterSize{}; //because tpcResidualsl[i].size() is not easily accessible
+		int ntpcHits=0, ntelescopeHits=0;
+		double dxz=0., dyz=0.;
+	};
+
+	struct BufferedTreeFiller {
+
+	};
+
 	vector<SimpleFitResult> telescopeFits{};
 	vector<SimpleFitResult> tpcFits{};
 	vector< vector<HitEntry> > tpcResiduals{};
 	int ntpcHits=0, ntelescopeHits=0;
 	vector<int> tpcClusterSize{};
 	double dxz=0., dyz=0.;
+
 	TH1D triggerStatus{"triggerStatus", "status of trigger", 1, 0, 1};
 	struct {
 		int priority=0; std::string message="";

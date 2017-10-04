@@ -71,12 +71,12 @@ std::ostream& operator<<(std::ostream& os, const TVector3& v) {
 void TrackCombiner::processTracks() {
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(0);
-	for(int i=0,j=0;
+	for(int telescopeEntryNumber=0,tpcEntryNumber=0;
 //			i<100000
 			;) {
 
 		// Get Entry and match trigger Numbers
-		auto matchStatus=getAndMatchEntries(i,j);
+		auto matchStatus=getAndMatchEntries(telescopeEntryNumber,tpcEntryNumber);
 //		printTriggers(i,j);
 //		if( cin.get()=='q') break;
 		if( matchStatus == MatchResult::end ) break;
@@ -120,6 +120,7 @@ void TrackCombiner::processTracks() {
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
 		const auto tpcClusters = tpcFitter.houghTransform(tpcHits);
+		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; triggerStatus.Fill(mes, 1); frameStatus.replace(5, mes); continue; };
 		for( auto& cluster : tpcClusters ) {
 			if(cluster.size()<2) continue;
 			auto fit= linearRegressionFit(cluster);
@@ -132,7 +133,6 @@ void TrackCombiner::processTracks() {
 
 //		cout<<"timepix passed!"<<endl;
 
-
 		//match fits and clusters + calculate residuals
 		tpcResiduals.clear();
 		int nmatched=0;
@@ -143,18 +143,22 @@ void TrackCombiner::processTracks() {
 			const auto& tpcFit=tpcFits[iFit];
 			for(unsigned jFit=0; jFit<telescopeFits.size(); jFit++) {
 				const auto& telescopeFit = telescopeFits[jFit];
+
+				//check if going through detector
 				TVector3 telescopePoint{ telescopeFit.xAt(timepixShift.z()), telescopeFit.yAt(timepixShift.z()), timepixShift.z() };
 				telescopePoint-=timepixShift;
+				telescopePoint=RotateAroundPoint(telescopePoint,-timepixXAngle, {0,-7,6}, {1,0,0});
+				telescopePoint=RotateAroundPoint(telescopePoint,-timepixYAngle, {11,0,6}, {0,1,0});
 				telescopePoint.SetY( -telescopePoint.y() );
-				cout<<telescopePoint<<endl;
 				if( isInsideDetector( telescopePoint, timePixChip ) ) {
 					atLeastOneThroughDetector=true;
 				}
+
 				//should we use the actual errors of the fit here?
 				if( fabs( tpcFit.xAt(timepixShift.z())-telescopeFit.xAt(timepixShift.z()) ) < 1.5
 					&& fabs( tpcFit.yAt(timepixShift.z())-telescopeFit.yAt(timepixShift.z()) ) < 1.5  ) {
 
-//					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
+					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
 					TVector3 average=tpcFittedClusters.at(iFit)->getAveragePosition();
 
@@ -239,11 +243,21 @@ void TrackCombiner::processTracks() {
 				if(displayEvent) cout<<"telescope and tpc fits do not match!"<<endl;
 				continue;
 			} else {
-//				cout<<"Success!"<<endl;
-				triggerStatus.Fill("Successful", 1);
-				frameStatus.replace(20, "Succesful");
-			}
+							}
 		}
+
+		//check if tpcEntry already has a matching fit
+		if( find(tpcEntryHasMatchingFit.begin(), tpcEntryHasMatchingFit.end(), tpcEntryNumber )!=tpcEntryHasMatchingFit.end() ) {
+			auto mes="Tpc entry already has a matching cluster"; triggerStatus.Fill(mes, 1); frameStatus.replace(10, mes); continue;
+		}
+
+//		cout<<"Success!";
+		triggerStatus.Fill("Successful", 1);
+		frameStatus.replace(20, "Successful");
+
+		tpcEntryHasMatchingFit.push_back(tpcEntryNumber);
+		//cleanup old entry info
+		while(not tpcEntryHasMatchingFit.empty() and tpcEntryHasMatchingFit.front()<tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin) ) tpcEntryHasMatchingFit.pop_front();
 
 		tpcClusterSize.clear();
 		for(unsigned iClust=0; iClust<tpcFittedClusters.size(); ++iClust) {

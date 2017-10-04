@@ -4,6 +4,13 @@
 #include "Hit.h"
 #include "TVector3.h"
 
+TVector3& RotateAroundPoint(TVector3& v, double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis) {
+	v-=rotationPoint;
+	v.Rotate(rotation, rotationAxis);
+	v+=rotationPoint;
+	return v;
+};
+
 struct PositionHit {
 	PositionHit() : PositionHit(0,0,0) {};
 	PositionHit(double x, double y, double z, int plane=0, int row=0, int column=0, int ToT=1) : x(x), y(y), z(z), row(row), column(column), plane(plane), ToT(ToT) {};
@@ -15,10 +22,8 @@ struct PositionHit {
 	void SetPosition(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };
 	void RotatePosition(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis) {
 		TVector3 v=getPosition();
-		v-=rotationPoint;
-		v.Rotate(rotation, rotationAxis);
-		v+=rotationPoint;
-		SetPosition( v);
+		v=RotateAroundPoint(v, rotation, rotationPoint, rotationAxis);
+		SetPosition(v);
 	};
 };
 
