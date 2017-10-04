@@ -21,7 +21,7 @@ using namespace std;
 
 TimePixFitter::TimePixFitter(std::string inputfile, const DetectorConfiguration& detector) :
 	detector(detector),
-	houghTransform(detector.xmin(), detector.xmax(), detector.ymin(), detector.ymax(), 12/*xbins*/, 12 /*ybins*/ ),
+	houghTransform(detector.xmin(), detector.xmax(), detector.ymin(), detector.ymax(), 2/*xbins*/, 2 /*ybins*/ ),
 	residualHistograms(nullptr),
 	hitsCentre(detector.getCentre() ), //initialise to regular centre of sensor
 	averageResidualFromSum{0,0}, //initialise to zero

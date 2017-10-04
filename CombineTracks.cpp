@@ -15,7 +15,7 @@ using namespace std;
 void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent=false) {
 
 	TrackCombiner combiner(mimosaInput, timepixInput);
-	combiner.openFile("fitResults2.root");
+	combiner.openFile("fitResults.root");
 	combiner.setDisplayEvent(displayEvent);
 	combiner.processTracks();
 

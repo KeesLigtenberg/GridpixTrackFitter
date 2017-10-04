@@ -93,7 +93,7 @@ void TrackCombiner::processTracks() {
 
 		//timepix
 		tpcFits.clear();
-		vector<HoughTransformer::HitCluster*> tpcFittedClusters;
+		vector<const HoughTransformer::HitCluster*> tpcFittedClusters; //todo: replace with actual cluster for removing hits from cluster
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { triggerStatus.Fill("Less than 20 hits in tpc", 1); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
@@ -106,7 +106,7 @@ void TrackCombiner::processTracks() {
 //			h.RotatePosition(0.29, {0,-7,6}, {1,0,0});
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
-		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
+		const auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		for( auto& cluster : tpcClusters ) {
 			if(cluster.size()<2) continue;
 			auto fit= linearRegressionFit(cluster);
@@ -120,9 +120,10 @@ void TrackCombiner::processTracks() {
 //		cout<<"timepix passed!"<<endl;
 
 
-		//match fits and clusters
+		//match fits and clusters + calculate residuals
 		tpcResiduals.clear();
 		int nmatched=0;
+		vector<SimpleFitResult> telescopeTPCLines;
 		std::vector<bool> tpcFitIsMatched(tpcFits.size()), telescopeFitIsMatched(telescopeFits.size());
 		for(unsigned iFit=0; iFit<tpcFits.size();++iFit) {
 			const auto& tpcFit=tpcFits[iFit];
@@ -134,7 +135,19 @@ void TrackCombiner::processTracks() {
 
 //					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
-					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), tpcFit);
+					TVector3 average=tpcFittedClusters.at(iFit)->getAveragePosition();
+
+					//draw line from telescope at z=0 to tpc centre
+					SimpleFitResult telescopeTPCLine{
+							(average.x()-telescopeFit.xAt(0))/average.z(),
+							telescopeFit.xAt(0),
+							(average.y()-telescopeFit.yAt(0))/average.z(),
+							telescopeFit.yAt(0),
+							0,0,0,0
+					};
+					telescopeTPCLines.push_back(telescopeTPCLine);
+
+					auto residuals=calculateResiduals(*tpcFittedClusters.at(iFit), telescopeFit);
 					//rotate back to frame of timepix
 					for(auto& r:residuals) {
 						auto v=r.getVector();
@@ -145,7 +158,6 @@ void TrackCombiner::processTracks() {
 //					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
 					tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
 
-					TVector3 average=tpcFittedClusters.at(iFit)->getAveragePosition();
 					dyz=(average.z()*telescopeFit.slope2+telescopeFit.intersept2-average.y())/sqrt(1+telescopeFit.slope2*telescopeFit.slope2);
 					dxz=(average.z()*telescopeFit.slope1+telescopeFit.intersept1-average.x())/sqrt(1+telescopeFit.slope1*telescopeFit.slope1);
 
@@ -192,7 +204,7 @@ void TrackCombiner::processTracks() {
 			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
 			timepixCanv->cd();
 			vector<SimpleFitResult> telescopeFitsInTimePixFrame;
-			for(auto& f : telescopeFits)
+			for(auto& f :telescopeFits ) //telescopeTPCLines)
 				telescopeFitsInTimePixFrame.push_back(
 						f.makeShifted(-timepixShift)
 						 .makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0})
@@ -248,12 +260,12 @@ TrackCombiner::MatchResult TrackCombiner::getAndMatchEntries(
 
 	//if also larger than end: reached the end of this telescope frame, continue with next telescope frame;
 	if( (tpcFitter.triggerNumber+triggerOffset) % 32768 > telescopeFitter.triggerNumberEnd) {
-		triggerStatus.Fill("Trigger numbers do not match", 1);
+//		triggerStatus.Fill("Trigger numbers do not match", 1);
 
-		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		if(previousTriggerNumberBegin!=telescopeFitter.triggerNumberBegin) {
 			nTelescopeTriggers++;
 		}
+		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		if( !telescopeFitter.getEntry(++telescopeEntry) ) return MatchResult::end;
 
 //		cout<<"increased telescopeEntry, first time pix match was: "<<timepixEntryFirstMatch<<endl;
