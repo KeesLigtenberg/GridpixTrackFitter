@@ -64,7 +64,7 @@ void TrackCombiner::processTracks() {
 
 		// Get Entry and match trigger Numbers
 		auto matchStatus=getAndMatchEntries(i,j);
-		printTriggers(i,j);
+//		printTriggers(i,j);
 //		if( cin.get()=='q') break;
 		if( matchStatus == MatchResult::end ) break;
 		else if( matchStatus == MatchResult::noMatch) continue;
@@ -98,7 +98,7 @@ void TrackCombiner::processTracks() {
 		if( !tpcFitter.passEvent(tpcHits) ) { triggerStatus.Fill("Less than 20 hits in tpc", 1); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
 		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
-		auto tpcHistInTimePixFrame=tpcHits;//save hits before rotation
+		auto tpcHistInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
 			h.RotatePosition(timepixYAngle, {11,0,6}, {0,1,0});
@@ -181,7 +181,7 @@ void TrackCombiner::processTracks() {
 				triggerStatus.Fill("Telescope and tpc fits do not match", 1);
 				continue;
 			} else {
-				cout<<"Success!"<<endl;
+//				cout<<"Success!"<<endl;
 				triggerStatus.Fill("Successful", 1);
 			}
 		}
@@ -193,7 +193,11 @@ void TrackCombiner::processTracks() {
 			timepixCanv->cd();
 			vector<SimpleFitResult> telescopeFitsInTimePixFrame;
 			for(auto& f : telescopeFits)
-				telescopeFitsInTimePixFrame.push_back( f.makeShifted(-timepixShift).makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0}).makeMirrorY() ); //
+				telescopeFitsInTimePixFrame.push_back(
+						f.makeShifted(-timepixShift)
+						 .makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0})
+						 .makeRotated(-timepixYAngle, {11,0,6}, {0,1,0})
+						 .makeMirrorY() ); //
 			tpcFitter.drawEvent(tpcHistInTimePixFrame, telescopeFitsInTimePixFrame);
 			gPad->Update();
 

@@ -12,10 +12,11 @@
 using namespace std;
 
 //returns correlation factor
-void CombineTracks(std::string mimosaInput, std::string timepixInput, int triggerOffset=0,  bool displayEvent=false) {
+void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent=false) {
 
 	TrackCombiner combiner(mimosaInput, timepixInput);
 	combiner.openFile("fitResults2.root");
+	combiner.setDisplayEvent(displayEvent);
 	combiner.processTracks();
 
 }

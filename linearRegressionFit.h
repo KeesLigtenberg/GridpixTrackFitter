@@ -47,6 +47,8 @@ struct SimpleFitResult {
 		double y[npoints] = {slope2 * zmin + intersept2, slope2 * zmax + intersept2};
 		double z[npoints] = {zmin, zmax};
 		TPolyLine3D l( npoints, z, y, x );
+		l.SetLineColor(kOrange+7);
+		l.SetLineWidth(2);
 		l.DrawClone();
 	}
 	bool isValid() const {

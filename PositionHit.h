@@ -6,7 +6,7 @@
 
 struct PositionHit {
 	PositionHit() : PositionHit(0,0,0) {};
-	PositionHit(double x, double y, double z, int plane=0, int row=0, int column=0, int ToT=1) : x(x), y(y), z(z), plane(plane), ToT(ToT), row(row), column(column) {};
+	PositionHit(double x, double y, double z, int plane=0, int row=0, int column=0, int ToT=1) : x(x), y(y), z(z), row(row), column(column), plane(plane), ToT(ToT) {};
 	double x,y,z;
 	int row, column, plane;
 	int ToT=1;
@@ -38,7 +38,10 @@ container convertHits(const std::vector<TimePixHit>& hv, double pixelwidth, doub
 		for(auto& h : hv) {
 			// .5 to center position in pixel
 			int plane=0;
-			phv.emplace_back( PositionHit{h.driftTime*driftSpeed /*z*/, (h.row+.5)*pixelheight /*y*/, (h.column+.5)*pixelwidth/*x*/, plane, h.row, h.column, h.charge /*charge=ToT*/} );
+			phv.emplace_back( PositionHit{
+				h.driftTime*driftSpeed /*z*/, (h.row+.5)*pixelheight /*y*/, (h.column+.5)*pixelwidth/*x*/,
+						plane, h.row, h.column,
+						h.charge /*charge=ToT*/} );
 		}
 		return phv;
 }

@@ -13,6 +13,8 @@
 #include "TCanvas.h"
 #include "TView.h"
 #include "TLegend.h"
+#include "TPaletteAxis.h"
+#include "TPaveLabel.h"
 
 #include "PositionHit.h"
 #include "Hit.h"
@@ -253,7 +255,7 @@ inline void HoughTransformer::drawClusters(const T& clusters, const DetectorConf
 	}
 
 	gStyle->SetMarkerStyle(20);
-	pointTree.Draw("h.z:h.y:h.x:cluster*10", "", "*");
+	pointTree.Draw("h.z:h.y:h.x:cluster*10", "", "*colz");
 	TH1* axisObject= dynamic_cast<TH1*>( gPad->GetPrimitive("htemp") );
 	const double xmax=detector.planexmax(), ymax=detector.planeymax();
 	axisObject->GetXaxis()->SetLimits(0,xmax);
@@ -265,8 +267,9 @@ inline void HoughTransformer::drawClusters(const T& clusters, const DetectorConf
 template<class T > //=std::list<HitCluster>
 inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfiguration& detector) {
 	TTree pointTree;
-	PositionHit h(0,0,0);
+	PositionHit h(1E4,1E4,1E4, 0,0,0, 0);
 	pointTree.Branch("h", &h);
+	pointTree.Fill(); //fill one with zero ToT to set scale
 
 	for(auto& iHit : cluster ) {
 		h=iHit;
@@ -275,7 +278,8 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 
 	gStyle->SetMarkerStyle(20);
 	gStyle->SetOptTitle(0);
-	pointTree.Draw("h.x:h.y:h.z:h.ToT", "", "*");
+	double totAxis=1.6;
+	pointTree.Draw( ("h.x:h.y:h.z:TMath::Min(h.ToT*0.025, "+std::to_string(totAxis)+")").c_str() , "", "*colz"); //ToT to microseconds
 	TH1* axisObject= dynamic_cast<TH1*>( gPad->GetPrimitive("htemp") );
 	auto zaxis=axisObject->GetZaxis();
 	zaxis->SetLimits(detector.xmin(),detector.xmax());
@@ -288,16 +292,40 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 	xaxis->SetTitle("pixel x-axis (beam direction) [mm]");
 	for(auto axis : {xaxis, yaxis} )
 		axis->SetTitleOffset(1.6);
-	axisObject->Draw();
+//	axisObject->SetMaximum(totAxis);
+//	axisObject->SetMinimum(0);
+	axisObject->Draw("colz");
 	double theta=70,phi=60;
 //	std::cout<<"give angles!"<<std::endl;
 //	std::cin>>theta>>phi;
+	gPad->SetMargin(0.1,0.175,0.1,0.1);
 	gPad->Update();
+
+
+	TPaletteAxis* palette= dynamic_cast<TPaletteAxis*>(gPad->GetPrimitive("palette"));
+	if(!palette) throw "could not find paletteAxis!";
+	palette->SetX1NDC(0.875);
+	palette->SetX2NDC(0.925);
+	palette->SetY2NDC(0.74);
+	palette->SetY1NDC(0.1);
+	//draw TPaveText over Palette axis title
+	auto paletteAxisLabel = new TPaveLabel(0.97,0.1,1,0.75, "ToT [#mus]", "NDC");
+	paletteAxisLabel->SetFillColor(kWhite);
+	paletteAxisLabel->SetBorderSize(0);
+	paletteAxisLabel->SetTextAngle(90);
+	paletteAxisLabel->SetTextSize(0.05);
+	paletteAxisLabel->SetTextFont(42);
+	paletteAxisLabel->SetTextAlign(kHAlignCenter+kVAlignCenter);
+	paletteAxisLabel->Draw();
+
+
 	gPad->GetView()->RotateView(theta, phi);
 
 	TLegend* legend= new TLegend( 0.6, 0.8, 0.95,0.95 );
 	legend->SetName("eventDisplayLegend");
-	legend->AddEntry(axisObject, "Timepix hits (ToT)", "p");
+	legend->AddEntry(axisObject, "Timepix hits", "p");
+	axisObject->SetLineColor(kOrange+7);
+	axisObject->SetLineWidth(2);
 	legend->AddEntry(axisObject, "Telescope track", "l");
 	legend->Draw();
 
