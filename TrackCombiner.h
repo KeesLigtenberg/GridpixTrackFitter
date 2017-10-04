@@ -58,7 +58,7 @@ private:
 	TimePixFitter tpcFitter;
 
 	int triggerOffset=-1;
-	int previousTriggerNumberBegin=0;
+	int previousTriggerNumberBegin=0, previousTriggerNumberEnd=0;
 	bool hadFirstMatch=false;
 	int timepixEntryFirstMatch=0;
 //	int previous2TriggerNumberBegin=0;
@@ -76,6 +76,14 @@ private:
 	vector<int> tpcClusterSize{};
 	double dxz=0., dyz=0.;
 	TH1D triggerStatus{"triggerStatus", "status of trigger", 1, 0, 1};
+	struct {
+		int priority=0; std::string message="";
+		void replace(int messagePriority, std::string newMessage) {
+			if(messagePriority>priority) { message=newMessage; priority=messagePriority;}
+		}
+		void reset() { priority=0; }
+	} frameStatus;
+	TH1D frameStatusHistogram{"frameStatus", "status of frame", 1,0,1};
 
 };
 
