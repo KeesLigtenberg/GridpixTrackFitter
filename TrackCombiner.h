@@ -10,6 +10,7 @@
 
 #include <string>
 #include <deque>
+#include <map>
 
 #include "TTree.h"
 #include "TGraph.h"
@@ -33,6 +34,44 @@
 #include "mimosaAlignment.h"
 #include "relativeAlignment.h"
 
+template <class K, class V>
+class Buffer {
+
+
+};
+
+class BufferedTreeFiller {
+public:
+	BufferedTreeFiller() { setTreeBranches(); };
+
+	struct TreeEntry {
+		vector<SimpleFitResult> telescopeFits{};
+		vector<SimpleFitResult> tpcFits{};
+		vector< vector<HitEntry> > tpcResiduals{};
+		vector<int> tpcClusterSize{}; //because tpcResidualsl[i].size() is not easily accessible
+		int ntpcHits=0, ntelescopeHits=0;
+		double dxz=0., dyz=0.;
+	};
+
+	void placeInBuffer(int tpcEntryNumber, const TreeEntry&);
+	void removeFromBuffer(int tpcEntryNumber);
+	void writeBufferUpTo(int tpcEntryNumber);
+	void writeBuffer();
+
+	void Write();
+	int64_t GetEntries() { return fitResultTree.GetEntriesFast(); };
+	void SetTreeDirectory(TFile* f) { fitResultTree.SetDirectory(f); }
+
+private:
+	TreeEntry currentEntry;
+	std::map<int,TreeEntry> buffer; //buffer by tpcEntryNumber
+
+	TTree fitResultTree{ "fitResults", "Tree with telescope and timepix fit results"};
+
+	void Fill(const TreeEntry&);
+	void setTreeBranches();
+};
+
 class TrackCombiner {
 public:
 	TrackCombiner(std::string mimosaInput, std::string timepixInput, const DetectorConfiguration& telescope=mimosa, const DetectorConfiguration& tpc=timePixChip);
@@ -47,7 +86,6 @@ public:
 	void drawEvent();
 
 private:
-	void setTreeBranches();
 	enum class MatchResult { match, noMatch, end };
 	MatchResult getAndMatchEntries(int& telescopeEntry, int& tpcStartEntry);
 	void printTriggers(int telescopeEntry, int tpcEntry) const;
@@ -68,38 +106,32 @@ private:
 	std::deque<int> tpcEntryHasMatchingFit{};
 
 	std::unique_ptr<TFile, std::function<void(TFile*)> > outputFile{nullptr, [](TFile* f) { f->Close(); delete f;} };
-	TTree fitResultTree{ "fitResults", "Tree with telescope and timepix fit results"};
 
 	//for tree
-	struct TreeEntry {
-		vector<SimpleFitResult> telescopeFits{};
-		vector<SimpleFitResult> tpcFits{};
-		vector< vector<HitEntry> > tpcResiduals{};
-		vector<int> tpcClusterSize{}; //because tpcResidualsl[i].size() is not easily accessible
-		int ntpcHits=0, ntelescopeHits=0;
-		double dxz=0., dyz=0.;
-	};
-
-	struct BufferedTreeFiller {
-
-	};
+	BufferedTreeFiller treeBuffer;
 
 	vector<SimpleFitResult> telescopeFits{};
 	vector<SimpleFitResult> tpcFits{};
-	vector< vector<HitEntry> > tpcResiduals{};
-	int ntpcHits=0, ntelescopeHits=0;
-	vector<int> tpcClusterSize{};
-	double dxz=0., dyz=0.;
+//	vector< vector<HitEntry> > tpcResiduals{};
+//	int ntpcHits=0, ntelescopeHits=0;
+//	vector<int> tpcClusterSize{};
+//	double dxz=0., dyz=0.;
 
-	TH1D triggerStatus{"triggerStatus", "status of trigger", 1, 0, 1};
-	struct {
+	struct statusKeeper {
+		statusKeeper(std::string name) : statusHistogram( (name+"Status").c_str(), ("status of "+name).c_str(), 1,0,1) {};
 		int priority=0; std::string message="";
 		void replace(int messagePriority, std::string newMessage) {
 			if(messagePriority>priority) { message=newMessage; priority=messagePriority;}
 		}
-		void reset() { priority=0; }
-	} frameStatus;
-	TH1D frameStatusHistogram{"frameStatus", "status of frame", 1,0,1};
+		void reset() {
+			if(priority) statusHistogram.Fill(message.c_str(),1);
+			priority=0;
+		}
+		TH1D statusHistogram;
+	}  frameStatusHistogram{"frame"}, triggerStatusHistogram{"trigger"};
+	void replaceStatus(int priority, std::string message) {
+		for(auto* s : {&frameStatusHistogram, &triggerStatusHistogram} ) s->replace(priority, message);
+	}
 
 };
 
