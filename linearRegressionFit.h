@@ -25,9 +25,18 @@ struct FitResult2D {
 	}
 
 	double slope, intercept;
-	double interceptz;
 	std::array<double, 3> error; //dslope^2, dslopeintercept, dintercept^2
-	double at(double z) { return intercept+slope*(z-interceptz); }
+	double interceptz;
+
+	double at(double z) const { return intercept+slope*(z-interceptz); }
+	bool isValid() const { return !(std::isnan(slope) || std::isnan(intercept)); }
+
+	FitResult2D makeShifted(double shift, double shiftz) const {
+		return { slope, intercept+shift, error, /*errors do not change*/ interceptz+shiftz };
+	}
+	FitResult2D makeMirror() const {
+		return {-slope, -intercept, error, interceptz};
+	}
 
 };
 
@@ -35,7 +44,51 @@ struct FitResult3D {
 	FitResult3D(FitResult2D XZ, FitResult2D YZ) : XZ(XZ), YZ(YZ) {};
 
 	FitResult2D XZ, YZ;
+
+	void draw(double zmin, double zmax) const;
+	bool isValid() const { return XZ.isValid() and YZ.isValid(); }
+
+	FitResult3D makeShifted( const TVector3& shift ) const {
+		return { XZ.makeShifted(shift.x(), shift.z()), YZ.makeShifted(shift.y(), shift.z())	};
+	}
+	FitResult3D makeMirrorY() const {
+		return {XZ, YZ.makeMirror()};
+	}
+	FitResult3D makeRotated(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis ) const;
 };
+
+void FitResult3D::draw(double zmin, double zmax) const {
+	const int npoints=2;
+	double x[npoints] = { XZ.at(zmin), XZ.at(zmax)};
+	double y[npoints] = { YZ.at(zmin), YZ.at(zmax)};
+	double z[npoints] = { zmin, zmax};
+	TPolyLine3D l( npoints, z, y, x );
+	l.SetLineColor(kOrange+7);
+	l.SetLineWidth(2);
+	l.DrawClone();
+}
+FitResult3D FitResult3D::makeRotated(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis ) const {
+	if( fabs(XZ.interceptz-YZ.interceptz) > 1E-10 ) throw "intercepts should be described at the same point in space!";
+	//rotate
+	TVector3 slope(XZ.slope, YZ.slope, 1), intercept(XZ.intercept, YZ.intercept, XZ.interceptz);
+	slope.Rotate(rotation, rotationAxis);
+	intercept=RotateAroundPoint(intercept, rotation, rotationPoint, rotationAxis);
+	//return result
+	return FitResult3D{
+		FitResult2D{
+			slope.x()/slope.z(),
+			intercept.z()*slope.x()/slope.z()+intercept.x(),
+			XZ.error,//todo:propagate errors!
+			intercept.z()
+		},
+		FitResult2D{
+			slope.y()/slope.z(),
+			intercept.z()*slope.y()/slope.z()+intercept.y(),
+			YZ.error,//todo:propagate errors!
+			intercept.z()
+		}
+	};
+}
 
 struct SimpleFitResult {
 	double slope1, intersept1, slope2, intersept2;

@@ -9,7 +9,6 @@
 
 #include "linearRegressionFit.h"
 
-
 FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double interceptz=0) {
     double sumX = 0;
     double sumZ = 0;
@@ -98,7 +97,49 @@ FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double int
 
 }
 
+FitResult2D regressionXZFixedIntercept(const HoughTransformer::HitCluster& cluster, double interceptx, double interceptz=0) {
+    double sumX = 0;
+    double sumZ = 0;
+    double sumXZ = 0;
+    double sumZsquare = 0;  // = Sum (Z^2)
+    double sumW = 0;
 
+    for(const auto& h : cluster) {
+    	double errorx2=1;
+    	double hiz=h.z-interceptz;
+		sumX += h.x/errorx2;
+		sumZ += hiz/errorx2;
+		sumXZ += h.x*hiz/errorx2;
+		sumZsquare += hiz*hiz/errorx2;
+		sumW+=1/errorx2;
+    }
+
+    // z <-> y from LinearTrackRegression::doRegressionX of marlinTPC
+    /** gives back parameters for \n
+     *  x = slope1 * z + intersept1\n
+     *  y = slope2 * z + intersept2\n
+     *
+     */
+
+    double denominator=(sumZ * sumZ - sumW * sumZsquare);
+    if(std::fabs(denominator)<1E-20){
+    	std::cerr<<"error: (sumZ * sumZ - ntot * sumZsquare)<1E-20"<<std::endl;
+    	std::cerr<<"sumZ="<<sumZ<<" sumZsquare="<<sumZsquare<<" ntot="<<sumW<<std::endl;
+    	std::cerr<<cluster.size()<<" hits on "<<cluster.getNPlanesHit()<<" planes"<<std::endl;
+    	throw "(sumZ * sumZ - ntot * sumZsquare)<1E-20";
+    }
+
+    double slope1     = (sumX * sumZ - sumW * sumXZ) / denominator;
+    double intersept1 = (sumZ * sumXZ - sumZsquare * sumX) / denominator;
+
+    double sigmaSlope2=sumZsquare/denominator;
+    double sigmaIntercept2=sumW/denominator;
+    double sigmaSlopeIntercept=-sumZ/denominator;
+    std::array<double,3> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
+
+    return FitResult2D(slope1, intersept1, error , interceptz);
+
+}
 
 FitResult3D regression3d(const HoughTransformer::HitCluster& cluster, double interceptz=0) {
 	return FitResult3D {
