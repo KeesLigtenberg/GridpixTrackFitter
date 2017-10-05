@@ -10,8 +10,8 @@
 
 #include <string>
 #include <deque>
-#include <map>
 
+#include "EntryBuffer.h"
 #include "TTree.h"
 #include "TGraph.h"
 #include "TH1.h"
@@ -21,6 +21,7 @@
 #include "linearRegressionFit.h"
 #include "ResidualHistogrammer.h"
 #include "HitEntry.h"
+
 
 #if 1 //root?
 #include "linearRegressionFit.cpp"
@@ -34,11 +35,6 @@
 #include "mimosaAlignment.h"
 #include "relativeAlignment.h"
 
-template <class K, class V>
-class Buffer {
-
-
-};
 
 class BufferedTreeFiller {
 public:
@@ -53,18 +49,17 @@ public:
 		double dxz=0., dyz=0.;
 	};
 
-	void placeInBuffer(int tpcEntryNumber, const TreeEntry&);
-	void removeFromBuffer(int tpcEntryNumber);
-	void writeBufferUpTo(int tpcEntryNumber);
-	void writeBuffer();
-
 	void Write();
 	int64_t GetEntries() { return fitResultTree.GetEntriesFast(); };
 	void SetTreeDirectory(TFile* f) { fitResultTree.SetDirectory(f); }
+	void placeInBuffer(int entryNumber, const TreeEntry& entry) {buffer.placeInBuffer(entryNumber, entry);}
+	void writeBufferUpTo(int entryNumber) { buffer.writeBufferUpTo(entryNumber, [this](TreeEntry&t){this->Fill(t);}); };
+	void writeBuffer() { buffer.writeBuffer([this](TreeEntry&t){this->Fill(t);}); };
+	void removeFromBuffer(int entryNumber) { buffer.removeFromBuffer(entryNumber); };
 
 private:
 	TreeEntry currentEntry;
-	std::map<int,TreeEntry> buffer; //buffer by tpcEntryNumber
+	EntryBuffer<int, TreeEntry> buffer;
 
 	TTree fitResultTree{ "fitResults", "Tree with telescope and timepix fit results"};
 
@@ -117,22 +112,32 @@ private:
 //	vector<int> tpcClusterSize{};
 //	double dxz=0., dyz=0.;
 
-	struct statusKeeper {
-		statusKeeper(std::string name) : statusHistogram( (name+"Status").c_str(), ("status of "+name).c_str(), 1,0,1) {};
+	struct StatusKeeper {
+		StatusKeeper(std::string name) : statusHistogram( new TH1D( (name+"Status").c_str(), ("status of "+name).c_str(), 1,0,1) ) {};
+		StatusKeeper(std::shared_ptr<TH1D> h) : statusHistogram(h) {};
+		StatusKeeper(const StatusKeeper&) = default;
+		virtual ~StatusKeeper() {};
 		int priority=0; std::string message="";
 		void replace(int messagePriority, std::string newMessage) {
 			if(messagePriority>priority) { message=newMessage; priority=messagePriority;}
 		}
 		void reset() {
-			if(priority) statusHistogram.Fill(message.c_str(),1);
+			if(priority) statusHistogram->Fill(message.c_str(),1);
 			priority=0;
 		}
-		TH1D statusHistogram;
-	}  frameStatusHistogram{"frame"}, triggerStatusHistogram{"trigger"};
-	void replaceStatus(int priority, std::string message) {
+		void Write() { statusHistogram->LabelsDeflate(); statusHistogram->Write(); };
+		std::shared_ptr<TH1D> statusHistogram;
+	}  frameStatusHistogram{"frame"}, triggerStatusHistogram{"trigger"}, timepixStatusHistogram{"timepixTrigger"};
+	EntryBuffer<int, StatusKeeper> timepixStatusKeepers;
+	void replaceStatus(int priority, std::string message, int tpcEntryNumber) {
 		for(auto* s : {&frameStatusHistogram, &triggerStatusHistogram} ) s->replace(priority, message);
+		if(!timepixStatusKeepers.isInBuffer(tpcEntryNumber)) {
+			timepixStatusKeepers.placeInBuffer(tpcEntryNumber, timepixStatusHistogram);
+		}
+		timepixStatusKeepers.getFromBuffer(tpcEntryNumber).replace(priority, message);
 	}
 
 };
+
 
 #endif /* TRACKCOMBINER_H_ */

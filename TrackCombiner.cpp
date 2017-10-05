@@ -34,9 +34,11 @@ TrackCombiner::~TrackCombiner() {
 		treeBuffer.Write();
 		triggerStatusHistogram.Write();
 		frameStatusHistogram.Write();
+		timepixStatusHistogram.Write();
 //		outputFile->Close(); taken care of in custom uniqueptr destructor
 	}
 }
+
 
 void BufferedTreeFiller::Fill(const TreeEntry& entry) {
 	currentEntry=entry;
@@ -44,38 +46,9 @@ void BufferedTreeFiller::Fill(const TreeEntry& entry) {
 }
 
 void BufferedTreeFiller::Write() {
-	writeBuffer();
+	buffer.writeBuffer( [this](TreeEntry&t){this->Fill(t);} );
 	fitResultTree.Write();
 }
-
-void BufferedTreeFiller::placeInBuffer(int tpcEntryNumber,
-		const TreeEntry& entry) {
-	if(not buffer.insert( {tpcEntryNumber, entry} ).second) {
-		throw "Unexpected element in buffer!";
-	}
-}
-
-void BufferedTreeFiller::removeFromBuffer(int tpcEntryNumber) {
-	auto result=buffer.find(tpcEntryNumber);
-	if(result==buffer.end()) throw "could not find entry in buffer";
-	buffer.erase(result);
-}
-
-void BufferedTreeFiller::writeBufferUpTo(int tpcEntryNumber) {
-	for(auto e=buffer.begin();
-			 e!=buffer.end() and e->first < tpcEntryNumber;
-			 e=buffer.erase(e) ) {
-		Fill(e->second);
-	}
-}
-
-void BufferedTreeFiller::writeBuffer() {
-	for(auto& e : buffer) {
-		Fill(e.second);
-	}
-	buffer.clear();
-}
-
 
 void BufferedTreeFiller::setTreeBranches() {
 	fitResultTree.Branch("telescopeFits", &currentEntry.telescopeFits);
@@ -126,7 +99,7 @@ void TrackCombiner::processTracks() {
 		//telescope
 		telescopeFits.clear();
 		auto telescopeHits=telescopeFitter.getSpaceHits();
-		if( !telescopeFitter.passEvent(telescopeHits) ) { replaceStatus(1, "less than 4 hits in telescope"); continue;} //minimal 4 planes!
+		if( !telescopeFitter.passEvent(telescopeHits) ) { replaceStatus(1, "less than 4 hits in telescope", tpcEntryNumber); continue;} //minimal 4 planes!
 		telescopeHits=telescopeFitter.rotateAndShift(telescopeHits);
 		for(auto&v:telescopeHits) for(auto&h:v) {
 			h.RotatePosition(-savedSlopes.first, {mimosa.getCentre().first,mimosa.getCentre().second,0}, {0,1,0} );
@@ -139,7 +112,7 @@ void TrackCombiner::processTracks() {
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			telescopeFits.push_back(fit);
 		}
-		if(telescopeFits.empty()) { replaceStatus(2, "All telescope clusters failed fit"); continue; }
+		if(telescopeFits.empty()) { replaceStatus(2, "All telescope clusters failed fit", tpcEntryNumber); continue; }
 
 //		cout<<"telescope passed!"<<endl;
 
@@ -147,7 +120,7 @@ void TrackCombiner::processTracks() {
 		tpcFits.clear();
 		vector<const HoughTransformer::HitCluster*> tpcFittedClusters; //todo: replace with actual cluster for removing hits from cluster
 		auto tpcHits=tpcFitter.getSpaceHits();
-		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc"); continue; }
+		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
 		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
 		auto tpcHistInTimePixFrame=tpcHits;//copy hits before rotation
@@ -159,7 +132,7 @@ void TrackCombiner::processTracks() {
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
 		const auto tpcClusters = tpcFitter.houghTransform(tpcHits);
-		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes); continue; };
+		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes, tpcEntryNumber); continue; };
 		for( auto& cluster : tpcClusters ) {
 			if(cluster.size()<2) continue;
 			auto fit= linearRegressionFit(cluster);
@@ -168,7 +141,7 @@ void TrackCombiner::processTracks() {
 			tpcFittedClusters.push_back(&cluster);
 //			cout<<"tpc fit: "<<fit<<endl;
 		}
-		if(tpcFits.empty()) { replaceStatus(4, "all tpc clusters failed fit"); continue; }
+		if(tpcFits.empty()) { replaceStatus(4, "all tpc clusters failed fit", tpcEntryNumber); continue; }
 
 //		cout<<"timepix passed!"<<endl;
 
@@ -259,7 +232,7 @@ void TrackCombiner::processTracks() {
 			if( telescopeFits.empty() || tpcFits.empty() ) {
 				auto message= atLeastOneThroughDetector ? "Telescope and tpc fits do not match" : "Telescope fit missed tpc";
 
-				replaceStatus(10, message);
+				replaceStatus(10, message, tpcEntryNumber);
 				if(displayEvent) cout<<"telescope and tpc fits do not match!"<<endl;
 				continue;
 			}
@@ -269,7 +242,7 @@ void TrackCombiner::processTracks() {
 		if( find(tpcEntryHasMatchingFit.begin(), tpcEntryHasMatchingFit.end(), tpcEntryNumber )!=tpcEntryHasMatchingFit.end() ) {
 			treeBuffer.removeFromBuffer(tpcEntryNumber);
 
-			auto mes="Tpc entry already has a matching cluster"; replaceStatus(10, mes);
+			auto mes="Tpc entry already has a matching cluster"; replaceStatus(10, mes, tpcEntryNumber);
 			if(displayEvent) cout<<mes<<endl;
 			continue;
 		}
@@ -294,11 +267,12 @@ void TrackCombiner::processTracks() {
 		}
 
 //		cout<<"Success!";
-		replaceStatus(20, "Successful");
+		replaceStatus(20, "Successful", tpcEntryNumber);
 
 		tpcEntryHasMatchingFit.push_back(tpcEntryNumber);
 		//cleanup old entry info
 		while(not tpcEntryHasMatchingFit.empty() and tpcEntryHasMatchingFit.front()<tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin) ) tpcEntryHasMatchingFit.pop_front();
+
 
 		for(unsigned iClust=0; iClust<tpcFittedClusters.size(); ++iClust) {
 			if(tpcFitIsMatched[iClust])	treeEntry.tpcClusterSize.push_back( tpcFittedClusters[iClust]->size());//count cluster size of only fitted clusters
@@ -309,7 +283,9 @@ void TrackCombiner::processTracks() {
 		treeEntry.telescopeFits=telescopeFits;
 		treeEntry.tpcFits=tpcFits;
 		treeBuffer.placeInBuffer(tpcEntryNumber, treeEntry);
-		treeBuffer.writeBufferUpTo(tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin));
+		int oldestRelevantTpcEntryNumber=tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin);
+		treeBuffer.writeBufferUpTo(oldestRelevantTpcEntryNumber);
+		timepixStatusKeepers.writeBufferUpTo(oldestRelevantTpcEntryNumber, [](StatusKeeper&s){s.reset();});
 
 		double telescopeSeconds=telescopeFitter.timestamp/40.E6, tpcSeconds=tpcFitter.timestamp/4096.*25E-9;
 		static double firstTimeDifference=telescopeSeconds-tpcSeconds;
