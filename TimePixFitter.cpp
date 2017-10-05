@@ -94,7 +94,7 @@ int TimePixFitter::getEntry(int iEvent) {
 }
 
 void TimePixFitter::drawEvent(const vector<PositionHit>& spaceHit,
-		const std::vector<SimpleFitResult>& fits) {
+		const std::vector<FitResult3D>& fits) {
 	HoughTransformer::drawCluster(spaceHit, detector);
 	//			HoughTransformer::drawClusters(houghClusters, detector);
 	for (auto& f : fits)
@@ -146,13 +146,13 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 		}
 
 		//first fit on outer planes and translate inner rawHits
-		std::vector<SimpleFitResult> fits;
+		std::vector<FitResult3D> fits;
 		for(auto& hitCluster : houghClusters) {
 
 			if(hitCluster.size()<2) continue;
 
 			//fit track
-			auto fit=linearRegressionFit(hitCluster);
+			auto fit=regressionFit3d(hitCluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 
 			//remove outliers
@@ -163,8 +163,8 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 			HoughTransformer::HitCluster selectedHits;
 			std::copy_if(hitCluster.begin(), hitCluster.end(), std::back_inserter(selectedHits), selectHitForRefit );
 			if(selectedHits.size()<2) continue;
-			if(constructLineParallelToZ) fit = SimpleFitResult{0,selectedHits.front().x, 0, selectedHits.front().y, 0,0,0,0};
-			else fit=linearRegressionFit(selectedHits);
+			if(constructLineParallelToZ) fit = makeLinesParallelToZ( selectedHits.front().x, selectedHits.front().y );
+			else fit=regressionFit3d(selectedHits);
 
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 
@@ -194,7 +194,7 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 			}
 
 			//sum fit slope
-			slope1Sum+=fit.slope1; slope2Sum+=fit.slope2;
+			slope1Sum+=fit.XZ.slope; slope2Sum+=fit.YZ.slope;
 
 			fits.push_back(fit);
 			if(makeTrackHistograms) { trackHistograms->fill(fit); }

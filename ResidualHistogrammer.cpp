@@ -115,10 +115,10 @@ double ResidualHistogrammer::PlaneHistograms::getRotationFromFit() {
 }
 
 TrackHistogrammer::TrackHistogrammer(const DetectorConfiguration& detector) :
-	phi("trackPhi", "track #Phi; #phi [rad.]; tracks", 20,M_PI/2.-0.01,M_PI/2.+0.01),
-	d0("trackd0", "track d_{0}; d_{0} [mm]; tracks", 20, 0, detector.planexmax() ),
-	tanLambda("trackTanLambda", "track tan(#lambda); tan(#lambda); tracks", 20,-0.01,0.01),
-	z0("trackz0", "track z_{0}; z_{0} [mm]; tracks", 20, 0, detector.planeymax() ),
+//	phi("trackPhi", "track #Phi; #phi [rad.]; tracks", 20,M_PI/2.-0.01,M_PI/2.+0.01),
+//	d0("trackd0", "track d_{0}; d_{0} [mm]; tracks", 20, 0, detector.planexmax() ),
+//	tanLambda("trackTanLambda", "track tan(#lambda); tan(#lambda); tracks", 20,-0.01,0.01),
+//	z0("trackz0", "track z_{0}; z_{0} [mm]; tracks", 20, 0, detector.planeymax() ),
 	slope1("slope1", "slope 1 (X); slope; tracks", 20, -1, 1),
 	slope2("slope2", "slope 2 (Y); slope; tracks", 20, -1, 1),
 	intercept1("intercept1", "intercept 1 (X); intercept; tracks", 20, -0.01, 0.01),
@@ -126,15 +126,15 @@ TrackHistogrammer::TrackHistogrammer(const DetectorConfiguration& detector) :
 	detector(detector)
 		{};
 
-void TrackHistogrammer::fill(SimpleFitResult fit) {
-	TrackFitResult entry(fit);
-	phi.Fill(entry.phi);
-	d0.Fill(entry.d0);
-	tanLambda.Fill(entry.tanlambda);
-	z0.Fill(entry.z0);
+void TrackHistogrammer::fill(const FitResult3D& fit) {
+//	TrackFitResult entry(fit);
+//	phi.Fill(entry.phi);
+//	d0.Fill(entry.d0);
+//	tanLambda.Fill(entry.tanlambda);
+//	z0.Fill(entry.z0);
 
-	slope1.Fill(fit.slope1);
-	slope2.Fill(fit.slope2);
-	intercept1.Fill(fit.intersept1);
-	intercept2.Fill(fit.intersept2);
+	slope1.Fill(fit.XZ.slope);
+	slope2.Fill(fit.YZ.slope);
+	intercept1.Fill(fit.XZ.intercept);
+	intercept2.Fill(fit.YZ.intercept);
 }

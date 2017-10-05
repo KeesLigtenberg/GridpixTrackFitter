@@ -108,7 +108,7 @@ void TrackCombiner::processTracks() {
 		auto telescopeClusters = telescopeFitter.houghTransform(telescopeHits);
 		for( auto& cluster : telescopeClusters) {
 			if(cluster.size()<5 || cluster.getNPlanesHit()<=4) continue;
-			auto fit= linearRegressionFit(cluster);
+			auto fit= regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			telescopeFits.push_back(fit);
 		}
@@ -135,7 +135,7 @@ void TrackCombiner::processTracks() {
 		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes, tpcEntryNumber); continue; };
 		for( auto& cluster : tpcClusters ) {
 			if(cluster.size()<2) continue;
-			auto fit= linearRegressionFit(cluster);
+			auto fit= regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			tpcFits.push_back(fit);
 			tpcFittedClusters.push_back(&cluster);
@@ -151,7 +151,7 @@ void TrackCombiner::processTracks() {
 		//match fits and clusters + calculate residuals
 		int nmatched=0;
 		bool atLeastOneThroughDetector=false;
-		vector<SimpleFitResult> telescopeTPCLines;
+		vector<FitResult3D> telescopeTPCLines;
 		std::vector<bool> tpcFitIsMatched(tpcFits.size()), telescopeFitIsMatched(telescopeFits.size());
 		for(unsigned iFit=0; iFit<tpcFits.size();++iFit) {
 			const auto& tpcFit=tpcFits[iFit];
@@ -169,20 +169,25 @@ void TrackCombiner::processTracks() {
 				}
 
 				//should we use the actual errors of the fit here?
-				if( fabs( tpcFit.xAt(timepixShift.z())-telescopeFit.xAt(timepixShift.z()) ) < 1.5
-					&& fabs( tpcFit.yAt(timepixShift.z())-telescopeFit.yAt(timepixShift.z()) ) < 1.5	  ) {
+				if( fabs( tpcFit.xAt(timepixShift.z())-telescopeFit.xAt(timepixShift.z()) ) < 1
+					&& fabs( tpcFit.yAt(timepixShift.z())-telescopeFit.yAt(timepixShift.z()) ) < 1	  ) {
 
 					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
 					TVector3 average=tpcFittedClusters.at(iFit)->getAveragePosition();
 
 					//draw line from telescope at z=0 to tpc centre
-					SimpleFitResult telescopeTPCLine{
-							(average.x()-telescopeFit.xAt(0))/average.z(),
-							telescopeFit.xAt(0),
-							(average.y()-telescopeFit.yAt(0))/average.z(),
-							telescopeFit.yAt(0),
-							0,0,0,0
+					FitResult3D telescopeTPCLine{
+							FitResult2D{
+								(average.x()-telescopeFit.xAt(0))/average.z(),
+								telescopeFit.xAt(0),
+								{0.,0.,0.}
+							},
+							FitResult2D{
+								(average.y()-telescopeFit.yAt(0))/average.z(),
+								telescopeFit.yAt(0),
+								{0.,0.,0.}
+							}
 					};
 					telescopeTPCLines.push_back(telescopeTPCLine);
 
@@ -197,8 +202,8 @@ void TrackCombiner::processTracks() {
 //					tpcResiduals.insert(tpcResiduals.end(), residuals.begin(), residuals.end() );
 					treeEntry.tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
 
-					treeEntry.dyz=(average.z()*telescopeFit.slope2+telescopeFit.intersept2-average.y())/sqrt(1+telescopeFit.slope2*telescopeFit.slope2);
-					treeEntry.dxz=(average.z()*telescopeFit.slope1+telescopeFit.intersept1-average.x())/sqrt(1+telescopeFit.slope1*telescopeFit.slope1);
+					treeEntry.dyz=(average.z()*telescopeFit.YZ.slope+telescopeFit.YZ.intercept-average.y())/sqrt(1+telescopeFit.YZ.slope*telescopeFit.YZ.slope);
+					treeEntry.dxz=(average.z()*telescopeFit.XZ.slope+telescopeFit.XZ.intercept-average.x())/sqrt(1+telescopeFit.XZ.slope*telescopeFit.XZ.slope);
 
 					++nmatched;
 					telescopeFitIsMatched[jFit]=true;
@@ -252,7 +257,7 @@ void TrackCombiner::processTracks() {
 
 			static TCanvas* timepixCanv=new TCanvas("timepix","Display of timepix event", 600,400);
 			timepixCanv->cd();
-			vector<SimpleFitResult> telescopeFitsInTimePixFrame;
+			vector<FitResult3D> telescopeFitsInTimePixFrame;
 			for(auto& f :telescopeFits ) //telescopeTPCLines)
 				telescopeFitsInTimePixFrame.push_back(
 						f.makeShifted(-timepixShift)

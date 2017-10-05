@@ -41,8 +41,8 @@ public:
 	BufferedTreeFiller() { setTreeBranches(); };
 
 	struct TreeEntry {
-		vector<SimpleFitResult> telescopeFits{};
-		vector<SimpleFitResult> tpcFits{};
+		vector<FitResult3D> telescopeFits{};
+		vector<FitResult3D> tpcFits{};
 		vector< vector<HitEntry> > tpcResiduals{};
 		vector<int> tpcClusterSize{}; //because tpcResidualsl[i].size() is not easily accessible
 		int ntpcHits=0, ntelescopeHits=0;
@@ -105,8 +105,8 @@ private:
 	//for tree
 	BufferedTreeFiller treeBuffer;
 
-	vector<SimpleFitResult> telescopeFits{};
-	vector<SimpleFitResult> tpcFits{};
+	vector<FitResult3D> telescopeFits{};
+	vector<FitResult3D> tpcFits{};
 //	vector< vector<HitEntry> > tpcResiduals{};
 //	int ntpcHits=0, ntelescopeHits=0;
 //	vector<int> tpcClusterSize{};

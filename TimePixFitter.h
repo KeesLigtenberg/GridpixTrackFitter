@@ -44,7 +44,7 @@ public:
 	int getEntry(int iEvent);
 
 	void drawEvent(const std::vector<PositionHit>& spaceHit,
-			const std::vector<SimpleFitResult>& fits);
+			const std::vector<FitResult3D>& fits);
 
 	bool displayEvent=false;
 	bool makeTrackHistograms=false;

@@ -29,7 +29,7 @@ struct HoughTransformer {
 
 	virtual ~HoughTransformer() {};
 
-	struct HitCluster : std::list<PositionHit> {
+	struct HitCluster : std::list<PositionHit> { //todo: make member variable instead of inheritance
 		int clusterSize=0, planeHit[nPlanes] = {} ;
 		void add( PositionHit h ) {
 			push_back(h);

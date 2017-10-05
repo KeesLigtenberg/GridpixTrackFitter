@@ -46,7 +46,7 @@ public:
 
 	void saveAlignment(std::string outputfile);
 	void drawEvent(const std::vector<std::vector<PositionHit> >& spaceHit,
-			const std::vector<SimpleFitResult>& fits);
+			const std::vector<FitResult3D>& fits);
 	static bool processDrawSignals();
 
 	bool displayEvent=false;
