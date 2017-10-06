@@ -65,15 +65,27 @@ void TrackCombiner::openFile(std::string filename) {
 	treeBuffer.SetTreeDirectory(outputFile.get());
 }
 
-bool isInsideDetector(const TVector3& p, const DetectorConfiguration& dc) {
-	return not( p.x()<dc.xmin()
-		or p.x() > dc.xmax()
-		or p.y() < dc.ymin()
-		or p.y() > dc.ymax() );
+bool isInsideDetector(const TVector3& p, const DetectorConfiguration& dc, double threshold=0) {
+	return not( p.x()<dc.xmin()-threshold
+		or p.x() > dc.xmax()+threshold
+		or p.y() < dc.ymin()-threshold
+		or p.y() > dc.ymax()+threshold );
 }
 
 std::ostream& operator<<(std::ostream& os, const TVector3& v) {
 	return cout<<"("<<v.x()<<", "<<v.y()<<", "<<v.z()<<")";
+}
+
+std::vector<FitResult3D>& eraseUnmatched(std::vector<FitResult3D>& fits, const std::vector<bool>& fitIsMatched) {
+	int iFit=0;
+	for(auto it=fits.begin(); it!=fits.end();) {
+		if(!fitIsMatched[iFit++]) {
+			it=fits.erase(it);
+		} else {
+			++it;
+		}
+	}
+	return fits;
 }
 
 void TrackCombiner::processTracks() {
@@ -120,7 +132,7 @@ void TrackCombiner::processTracks() {
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
-//		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
+		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.616349 /*mm/micros correction*/, 0.0566055, 0.4, 0.1 /*min ToT*/);
 		auto tpcHistInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
@@ -157,7 +169,7 @@ void TrackCombiner::processTracks() {
 				const auto& telescopeFit = telescopeFits[jFit];
 
 				//check if going through detector
-				TVector3 telescopePoint{ telescopeFit.xAt(timepixShift.z()), telescopeFit.yAt(timepixShift.z()), timepixShift.z() };
+				TVector3 telescopePoint{ telescopeFit.xAt(timepixShift.z()+6), telescopeFit.yAt(timepixShift.z()+6), timepixShift.z()+6 };
 				telescopePoint-=timepixShift;
 				telescopePoint=RotateAroundPoint(telescopePoint,-timepixXAngle, {0,-7,6}, {1,0,0});
 				telescopePoint=RotateAroundPoint(telescopePoint,-timepixYAngle, {11,0,6}, {0,1,0});
@@ -166,7 +178,6 @@ void TrackCombiner::processTracks() {
 					atLeastOneThroughDetector=true;
 				}
 
-				//should we use the actual errors of the fit here?
 				if( fabs( tpcFit.xAt(timepixShift.z())-telescopeFit.xAt(timepixShift.z()) ) < 1
 					&& fabs( tpcFit.yAt(timepixShift.z())-telescopeFit.yAt(timepixShift.z()) ) < 1	  ) {
 
@@ -211,41 +222,27 @@ void TrackCombiner::processTracks() {
 			}
 		}
 
-//		cout<<"matched "<<nmatched<<" clusters"<<endl;
 		//remove unmatched clusters
-		bool removeUnmatched=false;
+		bool removeUnmatched=true;
 		if(removeUnmatched) {
-			int iFit=0;
-			for(auto it=tpcFits.begin(); it!=tpcFits.end();) {
-				if(!tpcFitIsMatched[iFit++]) {
-					it=tpcFits.erase(it);
-				} else {
-					++it;
-				}
-			}
-			int jFit=0;
-			for(auto it=telescopeFits.begin(); it!=telescopeFits.end();) {
-				if(!telescopeFitIsMatched[jFit++]) {
-					it=telescopeFits.erase(it);
-				} else {
-					++it;
-				}
-			}
+			tpcFits=eraseUnmatched(tpcFits, tpcFitIsMatched);
+			telescopeFits=eraseUnmatched(telescopeFits, telescopeFitIsMatched);
 
 			if( telescopeFits.empty() || tpcFits.empty() ) {
 				auto message= atLeastOneThroughDetector ? "Telescope and tpc fits do not match" : "Telescope fit missed tpc";
-
 				replaceStatus(10, message, tpcEntryNumber);
 				if(displayEvent) cout<<"telescope and tpc fits do not match!"<<endl;
 				continue;
 			}
 		}
 
+		if(not atLeastOneThroughDetector) cerr<<"fit did not go through detector but did match!?"<<endl;
+
 		//check if tpcEntry already has a matching fit
 		if( find(tpcEntryHasMatchingFit.begin(), tpcEntryHasMatchingFit.end(), tpcEntryNumber )!=tpcEntryHasMatchingFit.end() ) {
 			treeBuffer.removeFromBuffer(tpcEntryNumber);
 
-			auto mes="Tpc entry already has a matching cluster"; replaceStatus(10, mes, tpcEntryNumber);
+			auto mes="Tpc entry already has a matching cluster"; replaceStatus(21, mes, tpcEntryNumber);
 			if(displayEvent) cout<<mes<<endl;
 			continue;
 		}

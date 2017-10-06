@@ -15,7 +15,7 @@ struct TimePixDetectorConfiguration : DetectorConfiguration {
 		1, {0}, //nplanes, planeposition
 		0.055, 256, 256 //pixelsize, xpixels, ypixels
 	} {};
-	virtual double xmin() const {return driftSpeed; }
+	virtual double xmin() const {return 0.*driftSpeed; }
 	virtual double xmax() const {return 225*driftSpeed; }
 	virtual double zmin() const {return 0; }
 	virtual double zmax() const {return pixelColumns*pixelsize; };
