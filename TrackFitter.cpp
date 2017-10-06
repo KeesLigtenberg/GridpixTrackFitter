@@ -217,6 +217,12 @@ void trackFitter::fitTracks(std::string outputfilename) {
 			fits.push_back(fit);
 			if(makeTrackHistograms) { trackHistograms->fill(fit); }
 
+			//give fit errors
+//			int i=0;
+//			for(auto& planez : detector.planePosition ) {
+//				cout<<"plane "<<i++<<": fit at "<<fit.xAt(planez)<<" +- "<<fit.XZ.errorAt(planez)<<", "<<fit.yAt(planez)<<" +- "<<fit.YZ.errorAt(planez)<<std::endl;
+//			}
+
 			++nClusters;
 		}
 

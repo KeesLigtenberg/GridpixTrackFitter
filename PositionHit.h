@@ -13,10 +13,12 @@ TVector3& RotateAroundPoint(TVector3& v, double rotation, const TVector3& rotati
 
 struct PositionHit {
 	PositionHit() : PositionHit(0,0,0) {};
-	PositionHit(double x, double y, double z, int plane=0, int row=0, int column=0, int ToT=1) : x(x), y(y), z(z), row(row), column(column), plane(plane), ToT(ToT) {};
+	PositionHit(double x, double y, double z, int plane=0, int row=0, int column=0, int ToT=1, double error2x=1, double error2y=1) :
+			x(x), y(y), z(z), row(row), column(column), plane(plane), ToT(ToT), error2x(error2x), error2y(error2y) {};
 	double x,y,z;
 	int row, column, plane;
 	int ToT=1;
+	double error2x=1, error2y=1;
 
 	TVector3 getPosition() const { return {x,y,z}; };
 	void SetPosition(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };
@@ -32,7 +34,12 @@ inline std::vector<PositionHit> convertHits(const std::vector<Hit>& hv, double p
 		for(auto& h : hv) {
 			// .5 to center position in pixel
 			int ToTTelescope=1;
-			phv.emplace_back( PositionHit{(h.column+.5)*pixelwidth, (h.row+.5)*pixelheight, planePosition, plane, h.row, h.column, ToTTelescope } );
+			phv.emplace_back(
+					PositionHit{
+						(h.column+.5)*pixelwidth, (h.row+.5)*pixelheight, planePosition,
+								plane, h.row, h.column,
+								ToTTelescope, pixelwidth*pixelwidth/12, pixelheight*pixelheight/12
+					} );
 		}
 		return phv;
 }

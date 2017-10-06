@@ -35,7 +35,6 @@ TrackCombiner::~TrackCombiner() {
 		triggerStatusHistogram.Write();
 		frameStatusHistogram.Write();
 		timepixStatusHistogram.Write();
-//		outputFile->Close(); taken care of in custom uniqueptr destructor
 	}
 }
 
@@ -67,8 +66,7 @@ void TrackCombiner::openFile(std::string filename) {
 }
 
 bool isInsideDetector(const TVector3& p, const DetectorConfiguration& dc) {
-	return not(
-		p.x()<dc.xmin()
+	return not( p.x()<dc.xmin()
 		or p.x() > dc.xmax()
 		or p.y() < dc.ymin()
 		or p.y() > dc.ymax() );
@@ -122,7 +120,7 @@ void TrackCombiner::processTracks() {
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
-		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
+//		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.1209 /*mm/ns correction*/, 0.05 /*min ToT*/);
 		auto tpcHistInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
@@ -215,7 +213,7 @@ void TrackCombiner::processTracks() {
 
 //		cout<<"matched "<<nmatched<<" clusters"<<endl;
 		//remove unmatched clusters
-		bool removeUnmatched=true;
+		bool removeUnmatched=false;
 		if(removeUnmatched) {
 			int iFit=0;
 			for(auto it=tpcFits.begin(); it!=tpcFits.end();) {

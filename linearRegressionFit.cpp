@@ -51,7 +51,7 @@ FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double int
     double sumW = 0;
 
     for(const auto& h : cluster) {
-    	double errorx2=1;
+    	double errorx2=h.error2x;
     	double hiz=h.z-interceptz;
 		sumX += h.x/errorx2;
 		sumZ += hiz/errorx2;
@@ -78,9 +78,9 @@ FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double int
     double slope1     = (sumX * sumZ - sumW * sumXZ) / denominator;
     double intersept1 = (sumZ * sumXZ - sumZsquare * sumX) / denominator;
 
-    double sigmaSlope2=sumZsquare/denominator;
-    double sigmaIntercept2=sumW/denominator;
-    double sigmaSlopeIntercept=-sumZ/denominator;
+    double sigmaIntercept2=-sumZsquare/denominator;
+    double sigmaSlopeIntercept=sumZ/denominator;
+    double sigmaSlope2=-sumW/denominator;
     std::vector<double> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
 
     return FitResult2D(slope1, intersept1, error , interceptz);
@@ -95,7 +95,7 @@ FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double int
     double sumW = 0;
 
     for(auto& h : cluster) {
-    	double errory2=1;//add error!
+    	double errory2=h.error2y;//add error!
     	double hiz=h.z-interceptz;
 		sumY += h.y/errory2;
 		sumZ += hiz/errory2;
@@ -122,9 +122,9 @@ FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double int
     double slope1     = (sumY * sumZ - sumW * sumYZ) / denominator;
     double intersept1 = (sumZ * sumYZ - sumZsquare * sumY) / denominator;
 
-    double sigmaSlope2=sumZsquare/denominator;
-    double sigmaIntercept2=sumW/denominator;
-    double sigmaSlopeIntercept=-sumZ/denominator;
+    double sigmaIntercept2=-sumZsquare/denominator;
+    double sigmaSlopeIntercept=sumZ/denominator;
+    double sigmaSlope2=-sumW/denominator;
     std::vector<double> error={ sigmaSlope2, sigmaSlopeIntercept, sigmaIntercept2 };
 
     return FitResult2D(slope1, intersept1, error, interceptz );
@@ -159,6 +159,7 @@ std::vector<Residual> calculateResiduals( const HoughTransformer::HitCluster& cl
 HoughTransformer::HitCluster&  cutOnResiduals( HoughTransformer::HitCluster& cluster, const std::vector<Residual>& residuals, double maxResidual ) {
 	auto res=residuals.begin();
 	int nremoved=cluster.size();
+	//no erase necessary because list version of remove_if
 	cluster.remove_if( [&res, &maxResidual](const PositionHit&){
 		bool cut= res->x>maxResidual || res->y>maxResidual;
 		++res;
