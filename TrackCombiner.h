@@ -53,8 +53,8 @@ public:
 	int64_t GetEntries() { return fitResultTree.GetEntriesFast(); };
 	void SetTreeDirectory(TFile* f) { fitResultTree.SetDirectory(f); }
 	void placeInBuffer(int entryNumber, const TreeEntry& entry) {buffer.placeInBuffer(entryNumber, entry);}
-	void writeBufferUpTo(int entryNumber) { buffer.writeBufferUpTo(entryNumber, [this](TreeEntry&t){this->Fill(t);}); };
-	void writeBuffer() { buffer.writeBuffer([this](TreeEntry&t){this->Fill(t);}); };
+	void emptyBufferUpTo(int entryNumber) { buffer.writeBufferUpTo(entryNumber, [this](TreeEntry&t){this->Fill(t);}); };
+	void emptyBuffer() { buffer.writeBuffer([this](TreeEntry&t){this->Fill(t);}); };
 	void removeFromBuffer(int entryNumber) { buffer.removeFromBuffer(entryNumber); };
 
 private:
@@ -66,6 +66,7 @@ private:
 	void Fill(const TreeEntry&);
 	void setTreeBranches();
 };
+
 
 class TrackCombiner {
 public:
@@ -107,15 +108,11 @@ private:
 
 	vector<FitResult3D> telescopeFits{};
 	vector<FitResult3D> tpcFits{};
-//	vector< vector<HitEntry> > tpcResiduals{};
-//	int ntpcHits=0, ntelescopeHits=0;
-//	vector<int> tpcClusterSize{};
-//	double dxz=0., dyz=0.;
 
-	struct StatusKeeper {
+	struct StatusKeeper{
 		StatusKeeper(std::string name) : statusHistogram( new TH1D( (name+"Status").c_str(), ("status of "+name).c_str(), 1,0,1) ) {};
 		StatusKeeper(std::shared_ptr<TH1D> h) : statusHistogram(h) {};
-		StatusKeeper(const StatusKeeper&) = default;
+		StatusKeeper(const TrackCombiner::StatusKeeper&) = default;
 		virtual ~StatusKeeper() {};
 		int priority=0; std::string message="";
 		void replace(int messagePriority, std::string newMessage) {
@@ -127,7 +124,7 @@ private:
 		}
 		void Write() { statusHistogram->LabelsDeflate(); statusHistogram->Write(); };
 		std::shared_ptr<TH1D> statusHistogram;
-	}  frameStatusHistogram{"frame"}, triggerStatusHistogram{"trigger"}, timepixStatusHistogram{"timepixTrigger"};
+	} frameStatusHistogram{"frame"}, triggerStatusHistogram{"trigger"}, timepixStatusHistogram{"timepixTrigger"};
 	EntryBuffer<int, StatusKeeper> timepixStatusKeepers;
 	void replaceStatus(int priority, std::string message, int tpcEntryNumber) {
 		for(auto* s : {&frameStatusHistogram, &triggerStatusHistogram} ) s->replace(priority, message);
@@ -138,6 +135,7 @@ private:
 	}
 
 };
+
 
 
 #endif /* TRACKCOMBINER_H_ */

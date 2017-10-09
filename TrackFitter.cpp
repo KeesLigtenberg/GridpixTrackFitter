@@ -361,9 +361,8 @@ bool trackFitter::processDrawSignals() {
 			gPad->GetView()->RotateView(thetaView, phiView);
 			gPad->Modified();
 			gPad->Update();
-			gPad->Print(
-					thetaView == 358 ?
-							"eventAnimation.gif++5++" : "eventAnimation.gif+5");
+			gPad->Print( thetaView == 358 ?	"eventAnimation.gif++5++" : "eventAnimation.gif+5");
+//			gPad->Print(( "eventAnimation"+to_string(thetaView/2)+".png" ).c_str());
 		}
 	}
 	return false;

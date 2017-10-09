@@ -10,7 +10,7 @@
 
 struct HitEntry {
 	HitEntry() : rx(), ry(), rz(),x(),y(),z(), ToT(), row(), col() {};
-	HitEntry(Residual r) :
+	HitEntry(const Residual& r) :
 		rx(r.x),
 		ry(r.y),
 		rz(r.z),

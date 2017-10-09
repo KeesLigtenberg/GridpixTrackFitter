@@ -31,12 +31,12 @@ struct HoughTransformer {
 
 	struct HitCluster : std::list<PositionHit> { //todo: make member variable instead of inheritance
 		int clusterSize=0, planeHit[nPlanes] = {} ;
-		void add( PositionHit h ) {
+		void add( const PositionHit& h ) {
 			push_back(h);
 			++clusterSize;
 			++planeHit[h.plane];
 		};
-		void add( PositionHit h, int plane ) {
+		void add( const PositionHit& h, int plane ) {
 			push_back(h);
 			++clusterSize;
 			++planeHit[plane];
