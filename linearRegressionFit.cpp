@@ -21,7 +21,7 @@ void FitResult3D::draw(double zmin, double zmax) const {
 	l.DrawClone();
 }
 FitResult3D FitResult3D::makeRotated(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis ) const {
-	if( fabs(XZ.interceptz-YZ.interceptz) > 1E-10 ) throw "intercepts should be described at the same point in space!";
+	if( fabs(XZ.interceptz-YZ.interceptz) > 1E-10 ) {cerr<<"intercepts should be described at the same point in space!\n"; throw "fabs(XZ.interceptz-YZ.interceptz) > 1E-10";}
 	//rotate
 	TVector3 slope(XZ.slope, YZ.slope, 1), intercept(XZ.intercept, YZ.intercept, XZ.interceptz);
 	slope.Rotate(rotation, rotationAxis);
@@ -161,7 +161,7 @@ HoughTransformer::HitCluster&  cutOnResiduals( HoughTransformer::HitCluster& clu
 	int nremoved=cluster.size();
 	//no erase necessary because list version of remove_if
 	cluster.remove_if( [&res, &maxResidual](const PositionHit&){
-		bool cut= res->x>maxResidual || res->y>maxResidual;
+		bool cut= res->x*res->x + res->y*res->y > maxResidual*maxResidual;
 		++res;
 		return cut;
 	} );

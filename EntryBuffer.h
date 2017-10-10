@@ -13,12 +13,13 @@
 #define ENTRYBUFFER_H_
 #include <map>
 #include <functional>
+#include <iostream>
 
 template <class K, class V>
 class EntryBuffer {
 public:
 	void placeInBuffer(K tpcEntryNumber, const V&);
-	bool isInBuffer(K tpcEntryNumber);
+	bool isInBuffer(K tpcEntryNumber) const;
 	V& getFromBuffer(K tpcEntryNumber);
 	void removeFromBuffer(K tpcEntryNumber);
 	void writeBufferUpTo(K tpcEntryNumber, std::function<void(V&)> function);
@@ -31,12 +32,12 @@ private:
 template<class K, class V>
 inline void EntryBuffer<K, V>::placeInBuffer(K tpcEntryNumber, const V& entry) {
 	if(not buffer.insert( {tpcEntryNumber, entry} ).second) {
-		throw "Unexpected element in buffer!";
+		std::cerr<<"Unexpected element in buffer!"; throw "Unexpected element in buffer!";
 	}
 }
 
 template<class K, class V>
-inline bool EntryBuffer<K, V>::isInBuffer(K tpcEntryNumber) {
+inline bool EntryBuffer<K, V>::isInBuffer(K tpcEntryNumber) const {
 	if( buffer.find(tpcEntryNumber) == buffer.end() ) {
 		return false;
 	} else {
@@ -52,7 +53,7 @@ inline V& EntryBuffer<K, V>::getFromBuffer(K tpcEntryNumber) {
 template <class K, class V>
 inline void EntryBuffer<K,V>::removeFromBuffer(K tpcEntryNumber) {
 	auto result=buffer.find(tpcEntryNumber);
-	if(result==buffer.end()) throw "Could not find entry in buffer";
+	if(result==buffer.end()) { std::cerr<<"Could not find entry in buffer"; throw "Could not find entry in buffer"; }
 	buffer.erase(result);
 }
 

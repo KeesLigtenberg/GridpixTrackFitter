@@ -50,12 +50,14 @@ public:
 	};
 
 	void Write();
-	int64_t GetEntries() { return fitResultTree.GetEntriesFast(); };
+	int64_t GetEntries() { return fitResultTree.GetEntriesFast(); }
 	void SetTreeDirectory(TFile* f) { fitResultTree.SetDirectory(f); }
 	void placeInBuffer(int entryNumber, const TreeEntry& entry) {buffer.placeInBuffer(entryNumber, entry);}
-	void emptyBufferUpTo(int entryNumber) { buffer.writeBufferUpTo(entryNumber, [this](TreeEntry&t){this->Fill(t);}); };
-	void emptyBuffer() { buffer.writeBuffer([this](TreeEntry&t){this->Fill(t);}); };
-	void removeFromBuffer(int entryNumber) { buffer.removeFromBuffer(entryNumber); };
+	void emptyBufferUpTo(int entryNumber) { buffer.writeBufferUpTo(entryNumber, [this](TreeEntry&t){this->Fill(t);}); }
+	void emptyBuffer() { buffer.writeBuffer([this](TreeEntry&t){this->Fill(t);}); }
+	void removeFromBuffer(int entryNumber) { buffer.removeFromBuffer(entryNumber); }
+	bool isInBuffer(int tpcEntryNumber) const { return buffer.isInBuffer(tpcEntryNumber); }
+	TTree& getTree() { return fitResultTree; }
 
 private:
 	TreeEntry currentEntry;
@@ -79,7 +81,10 @@ public:
 
 
 	void processTracks();
-	void drawEvent();
+
+	template <class T>
+	void drawEvent(const T& hits,
+			const std::vector<FitResult3D>& fits);
 
 private:
 	enum class MatchResult { match, noMatch, end };
