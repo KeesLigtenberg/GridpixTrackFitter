@@ -21,6 +21,7 @@
 #include "linearRegressionFit.h"
 #include "ResidualHistogrammer.h"
 #include "HitEntry.h"
+#include "Alignment.h"
 
 
 #if 1 //root?
@@ -47,6 +48,7 @@ public:
 		vector<int> tpcClusterSize{}; //because tpcResidualsl[i].size() is not easily accessible
 		int ntpcHits=0, ntelescopeHits=0;
 		double dxz=0., dyz=0.;
+		int nfitted=0, nresiduals=0;
 	};
 
 	void Write();
@@ -93,6 +95,7 @@ private:
 
 	const DetectorConfiguration& telescope;
 	const DetectorConfiguration& tpcDetector;
+	TimeWalkCorrector timeWalkCorrection{  0.1 /*min ToT*/, 0.616349 /*mm/micros correction*/, 0.0566055, 0.4 /*shift all hits*/};
 
 	trackFitter telescopeFitter;
 	TimePixFitter tpcFitter;

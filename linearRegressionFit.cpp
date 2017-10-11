@@ -21,7 +21,7 @@ void FitResult3D::draw(double zmin, double zmax) const {
 	l.DrawClone();
 }
 FitResult3D FitResult3D::makeRotated(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis ) const {
-	if( fabs(XZ.interceptz-YZ.interceptz) > 1E-10 ) {cerr<<"intercepts should be described at the same point in space!\n"; throw "fabs(XZ.interceptz-YZ.interceptz) > 1E-10";}
+	if( fabs(XZ.interceptz-YZ.interceptz) > 1E-10 ) {std::cerr<<"intercepts should be described at the same point in space!\n"; throw "fabs(XZ.interceptz-YZ.interceptz) > 1E-10";}
 	//rotate
 	TVector3 slope(XZ.slope, YZ.slope, 1), intercept(XZ.intercept, YZ.intercept, XZ.interceptz);
 	slope.Rotate(rotation, rotationAxis);
@@ -30,15 +30,15 @@ FitResult3D FitResult3D::makeRotated(double rotation, const TVector3& rotationPo
 	return FitResult3D{
 		FitResult2D{
 			slope.x()/slope.z(),
-			intercept.z()*slope.x()/slope.z()+intercept.x(),
+			-intercept.z()*slope.x()/slope.z()+intercept.x(),
 			XZ.error,//todo:propagate errors!
-			intercept.z()
+			0,//intercept.z()
 		},
 		FitResult2D{
 			slope.y()/slope.z(),
-			intercept.z()*slope.y()/slope.z()+intercept.y(),
+			-intercept.z()*slope.y()/slope.z()+intercept.y(),
 			YZ.error,//todo:propagate errors!
-			intercept.z()
+			0,//intercept.z()
 		}
 	};
 }

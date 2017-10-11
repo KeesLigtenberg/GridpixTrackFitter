@@ -28,7 +28,7 @@ struct FitResult2D {
 	std::vector<double> error; //dslope^2, dslopeintercept, dintercept^2 todo: replace with std::array<3>, when root supports this
 	double interceptz;
 
-	double at(double z) const { return intercept+slope*(z-interceptz); } //check math
+	double at(double z) const { return intercept+slope*(z+interceptz); } //check math
 	double error2At(double z) const { return z*z*error[0]+2*z*error[1]+error[2]; }
 	double errorAt(double z) const { return sqrt(error2At(z)); }
 	bool isValid() const { return !(std::isnan(slope) || std::isnan(intercept)); }

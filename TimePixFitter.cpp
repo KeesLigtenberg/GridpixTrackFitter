@@ -284,16 +284,3 @@ void TimePixFitter::setSlopes(std::pair<double, double> slopes) {
 	houghTransform.angleOfTracksY=slopes.second;
 }
 
-std::vector<PositionHit>& TimePixFitter::correctTimeWalk(
-		std::vector<PositionHit>& spaceHit, double coefficient /*mm/micros*/, double shiftt, double shiftx, double minToT) {
-//	cout<<spaceHit.size()<<" - ";
-	spaceHit.erase(
-			std::remove_if(spaceHit.begin(), spaceHit.end(), [&minToT](const PositionHit&h) {return (h.ToT*0.025) <minToT;} ),
-			spaceHit.end()
-	);
-//	cout<<spaceHit.size()<<endl;
-	for(auto& h : spaceHit) {
-		h.x=h.x-coefficient/(h.ToT*0.025+shiftt)+shiftx;
-	}
-	return spaceHit;
-}

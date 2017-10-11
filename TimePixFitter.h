@@ -61,8 +61,6 @@ protected:
 	std::vector<PositionHit> getSpaceHits();
 	std::vector<PositionHit>&  rotateAndShift(
 			std::vector<PositionHit>& spaceHit);
-	std::vector<PositionHit>&  correctTimeWalk(
-			std::vector<PositionHit>& spaceHit, double coefficient, double shiftt, double shiftx, double minToT=0);
 
 private:
 	TFile* file;

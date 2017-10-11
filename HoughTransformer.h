@@ -295,7 +295,6 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 //	axisObject->SetMaximum(totAxis);
 //	axisObject->SetMinimum(0);
 	axisObject->Draw("colz");
-	double theta=70,phi=60;
 //	std::cout<<"give angles!"<<std::endl;
 //	std::cin>>theta>>phi;
 	gPad->SetMargin(0.1,0.175,0.1,0.1);
@@ -319,6 +318,7 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 	paletteAxisLabel->Draw();
 
 
+	double theta=70,phi=60;
 	gPad->GetView()->RotateView(theta, phi);
 
 	TLegend* legend= new TLegend( 0.6, 0.8, 0.95,0.95 );

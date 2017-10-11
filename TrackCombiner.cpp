@@ -86,6 +86,8 @@ void BufferedTreeFiller::setTreeBranches() {
 	fitResultTree.Branch("timepixHits", &currentEntry.tpcResiduals);
 	fitResultTree.Branch("dxz", &currentEntry.dxz);
 	fitResultTree.Branch("dyz", &currentEntry.dyz);
+	fitResultTree.Branch("nresiduals", &currentEntry.nresiduals);
+	fitResultTree.Branch("nfitted", &currentEntry.nfitted);
 }
 
 void TrackCombiner::openFile(std::string filename) {
@@ -194,7 +196,7 @@ void TrackCombiner::processTracks() {
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
-		tpcHits=tpcFitter.correctTimeWalk(tpcHits, 0.616349 /*mm/micros correction*/, 0.0566055, 0.4 /*shift all hits*/ , 0.2 /*min ToT*/);
+		tpcHits=timeWalkCorrection.correctTimeWalk(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
@@ -267,10 +269,12 @@ void TrackCombiner::processTracks() {
 
 					//make alternative fit using an extra point in telescope
 					auto splitTpcCluster=splitCluster(tpcFittedClusters.at(iFit), [](const PositionHit& h) {
-//						return h.column<128;
-						return (h.column+h.row)%2;
+						return h.column<128;
+//						return (h.column+h.row)%2;
 					});
 //					cout<<splittedTpcCluster.first.size()<<" - "<<splittedTpcCluster.second.size()<<"\n";
+					treeEntry.nfitted=splitTpcCluster.first.size();
+					treeEntry.nresiduals=splitTpcCluster.second.size();
 					if(splitTpcCluster.first.size()<1 or splitTpcCluster.second.size()<1) {
 						cout<<"split cluster has no hits!\n";
 						continue;
@@ -293,8 +297,8 @@ void TrackCombiner::processTracks() {
 					}
 					treeEntry.tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
 
-//					average=splittedTpcCluster.second.getAveragePosition();
-					auto& fit=telescopeFit; //telescopeFit, combinedFit
+					average=splitTpcCluster.second.getAveragePosition();
+					auto& fit=combinedFit; //telescopeFit,combinedFit
 					treeEntry.dyz=(average.z()*fit.YZ.slope+fit.YZ.intercept-average.y())/sqrt(1+fit.YZ.slope*fit.YZ.slope);
 					treeEntry.dxz=(average.z()*fit.XZ.slope+telescopeFit.XZ.intercept-average.x())/sqrt(1+fit.XZ.slope*fit.XZ.slope);
 
@@ -323,9 +327,9 @@ void TrackCombiner::processTracks() {
 		if(not atLeastOneThroughDetector) cerr<<"fit did not go through detector but did match!?"<<endl;
 
 		//display event
-		if( displayEvent and double(tpcFittedClusters.front().size())/tpcHits.size()>0.9 ) {
-			drawEvent(tpcHits, tpcFits);
-			drawEvent(tpcFittedClusters.front(), tpcFits);
+		if( displayEvent and tpcHits.size()<300 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
+			drawEvent(tpcHits, telescopeFits);
+//			drawEvent(tpcFittedClusters.front(), telescopeTPCLines);
 			if( telescopeFitter.processDrawSignals()  ) break;
 		}
 
@@ -371,7 +375,10 @@ void TrackCombiner::processTracks() {
 	cout<<"highest telescope trigger (number of unique) "<< telescopeFitter.triggerNumberEnd<<" ("<<nTelescopeTriggers<<")"<<endl;
 	cout<<"number of entries in timepix "<<tpcFitter.nEvents<<endl;
 
+	treeBuffer.emptyBuffer();
 	cout<<"entries in tree "<<treeBuffer.GetEntries()<<endl;
+
+//	timeWalkCorrection.calculateTimeWalk(&treeBuffer.getTree());
 
 
 }
