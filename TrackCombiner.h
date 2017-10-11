@@ -88,6 +88,8 @@ public:
 	void drawEvent(const T& hits,
 			const std::vector<FitResult3D>& fits);
 
+	TimeWalkCorrector timeWalkCorrection{  0.1 /*min ToT*/, 0.616349 /*mm/micros correction*/, 0.0566055, 0.4 /*shift all hits*/};
+
 private:
 	enum class MatchResult { match, noMatch, end };
 	MatchResult getAndMatchEntries(int& telescopeEntry, int& tpcStartEntry);
@@ -95,7 +97,6 @@ private:
 
 	const DetectorConfiguration& telescope;
 	const DetectorConfiguration& tpcDetector;
-	TimeWalkCorrector timeWalkCorrection{  0.1 /*min ToT*/, 0.616349 /*mm/micros correction*/, 0.0566055, 0.4 /*shift all hits*/};
 
 	trackFitter telescopeFitter;
 	TimePixFitter tpcFitter;

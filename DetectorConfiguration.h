@@ -28,12 +28,13 @@ struct DetectorConfiguration {
 	double planexmax() const { return pixelColumns*pixelsize; }
 	double planeymax() const { return pixelRows*pixelsize; }
 
-	virtual double xmax() const { return planexmax(); };
-	virtual double xmin() const { return 0.; };
-	virtual double ymax() const { return planeymax(); };
-	virtual double ymin() const { return 0.; };
-	virtual double zmax() const { return planePosition.back(); };
-	virtual double zmin() const { return planePosition.front(); };
+	virtual double xmax() const { return planexmax(); }
+	virtual double xmin() const { return 0.; }
+	virtual double ymax() const { return planeymax(); }
+	virtual double ymin() const { return 0.; }
+	virtual double zmax() const { return planePosition.back(); }
+	virtual double zmin() const { return planePosition.front(); }
+	virtual double zmean() const { return (zmin()+zmax())/2; }
 
 	virtual std::pair<double,double> getCentre() const { return { (xmax()-xmin())/2, (ymax()-ymin())/2 }; };
 

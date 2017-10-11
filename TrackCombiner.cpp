@@ -245,8 +245,8 @@ void TrackCombiner::processTracks() {
 					atLeastOneThroughDetector=true;
 				}
 
-				if( fabs( tpcFit.xAt(timepixShift.z())-telescopeFit.xAt(timepixShift.z()) ) < 1
-					&& fabs( tpcFit.yAt(timepixShift.z())-telescopeFit.yAt(timepixShift.z()) ) < 1	  ) {
+				if( fabs( tpcFit.xAt(timepixShift.z()+timePixChip.zmean())-telescopeFit.xAt(timepixShift.z()+timePixChip.zmean()) ) < 1
+					&& fabs( tpcFit.yAt(timepixShift.z()+timePixChip.zmean())-telescopeFit.yAt(timepixShift.z()+timePixChip.zmean()) ) < 1	  ) {
 
 					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
@@ -378,8 +378,9 @@ void TrackCombiner::processTracks() {
 	treeBuffer.emptyBuffer();
 	cout<<"entries in tree "<<treeBuffer.GetEntries()<<endl;
 
-//	timeWalkCorrection.calculateTimeWalk(&treeBuffer.getTree());
-
+	timeWalkCorrection.calculateTimeWalk(&treeBuffer.getTree());
+	std::ofstream fout("timeWalkParameters.dat");
+	timeWalkCorrection.save(fout);
 
 }
 
