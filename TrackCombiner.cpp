@@ -16,18 +16,19 @@ void TrackCombiner::drawEvent(const T& hits,
 		const std::vector<FitResult3D>& fits) {
 	static TCanvas* timepixCanv=new TCanvas(typeid(T).name(),"Display of timepix event", 600,400);
 	timepixCanv->cd();
+	auto& ra=alignment.relativeAlignment;
 	vector<FitResult3D> fitsInTimePixFrame;
 	for(auto& f :tpcFits ) //telescopeTPCLines)
 		fitsInTimePixFrame.push_back(
-				f.makeShifted(-timepixShift)
-				 .makeRotated(-timepixXAngle, {0,-7,6}, {1,0,0})
-				 .makeRotated(-timepixYAngle, {11,0,6}, {0,1,0})
+				f.makeShifted(-ra.shift)
+				 .makeRotated(-ra.angle[0], {0,-7,6}, {1,0,0})
+				 .makeRotated(-ra.angle[1], {11,0,6}, {0,1,0})
 				 .makeMirrorY() ); //
 	auto hitsInTimepixFrame=hits;
 	for(auto& h: hitsInTimepixFrame) {
-		h.SetPosition(h.getPosition() - timepixShift);
-		h.RotatePosition(-timepixXAngle, {0,-7,6}, {1,0,0});
-		h.RotatePosition(-timepixYAngle, {11,0,6}, {0,1,0});
+		h.SetPosition(h.getPosition() - ra.shift);
+		h.RotatePosition(-ra.angle[0], {0,-7,6}, {1,0,0});
+		h.RotatePosition(-ra.angle[1], {11,0,6}, {0,1,0});
 		h.y=-h.y;
 	}
 	HoughTransformer::drawCluster(hitsInTimepixFrame, timePixChip);
@@ -105,13 +106,14 @@ bool isInsideDetector(const TVector3& p, const DetectorConfiguration& dc, double
 //returns 0 if not through
 //returns 1 if through either front or back
 //returns 2 if through both front and back
-int goesThroughTimepix(const FitResult3D& fit, const DetectorConfiguration& dc=timePixChip, double threshold=0) {
+int goesThroughTimepix(const FitResult3D& fit, const Alignment& alignment, const DetectorConfiguration& dc=timePixChip, double threshold=0) {
 	int nPlanes=0;
+	auto& ra=alignment.relativeAlignment;
 	for(double z : {dc.zmin(), dc.zmax() }) {
-		TVector3 telescopePoint{ fit.xAt(timepixShift.z()+z), fit.yAt(timepixShift.z()+z), timepixShift.z()+z };
-		telescopePoint-=timepixShift;
-		telescopePoint=RotateAroundPoint(telescopePoint,-timepixXAngle, {0,-7,6}, {1,0,0});
-		telescopePoint=RotateAroundPoint(telescopePoint,-timepixYAngle, {11,0,6}, {0,1,0});
+		TVector3 telescopePoint{ fit.xAt(ra.shift.z()+z), fit.yAt(ra.shift.z()+z), ra.shift.z()+z };
+		telescopePoint-=ra.shift;
+		telescopePoint=RotateAroundPoint(telescopePoint,-ra.angle[0], {0,-7,6}, {1,0,0});
+		telescopePoint=RotateAroundPoint(telescopePoint,-ra.angle[1], {11,0,6}, {0,1,0});
 		telescopePoint.SetY( -telescopePoint.y() );
 		if( isInsideDetector( telescopePoint, timePixChip ) ) {
 			++nPlanes;
@@ -149,6 +151,8 @@ std::pair<HoughTransformer::HitCluster, HoughTransformer::HitCluster> splitClust
 }
 
 void TrackCombiner::processTracks() {
+	const TVector3& timepixShift=alignment.relativeAlignment.shift;
+
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(0);
 	for(int telescopeEntryNumber=0,tpcEntryNumber=0;
@@ -196,12 +200,12 @@ void TrackCombiner::processTracks() {
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits);
-		tpcHits=timeWalkCorrection.correctTimeWalk(tpcHits);
+		tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
-			h.RotatePosition(timepixYAngle, {11,0,6}, {0,1,0});
-			h.RotatePosition(timepixXAngle, {0,-7,6}, {1,0,0});
+			h.RotatePosition(alignment.relativeAlignment.angle[1], {11,0,6}, {0,1,0});
+			h.RotatePosition(alignment.relativeAlignment.angle[0], {0,-7,6}, {1,0,0});
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
@@ -221,7 +225,7 @@ void TrackCombiner::processTracks() {
 			tpcFittedClusters.push_back(cluster);
 		}
 		if(tpcFits.empty()) { replaceStatus(4, "all tpc clusters failed fit", tpcEntryNumber); continue; }
-		if(none_of(tpcFits.begin(), tpcFits.end(), [](const FitResult3D& f) { return goesThroughTimepix(f) == 2; } )) {
+		if(none_of(tpcFits.begin(), tpcFits.end(), [this](const FitResult3D& f) { return goesThroughTimepix(f, alignment) == 2; } )) {
 			replaceStatus(5, "tpc fit leaves or enters on the side", tpcEntryNumber); continue;
 		}
 
@@ -241,7 +245,7 @@ void TrackCombiner::processTracks() {
 				const auto& telescopeFit = telescopeFits[jFit];
 
 				//check if going through detector
-				if( goesThroughTimepix(telescopeFit) ) {
+				if( goesThroughTimepix(telescopeFit, alignment) ) {
 					atLeastOneThroughDetector=true;
 				}
 
@@ -291,8 +295,8 @@ void TrackCombiner::processTracks() {
 					//rotate back to frame of timepix
 					for(auto& r:residuals) {
 						auto v=r.getVector();
-						v.Rotate(-timepixXAngle, {1,0,0});
-						v.Rotate(-timepixYAngle, {0,1,0});
+						v.Rotate(-alignment.relativeAlignment.angle[0], {1,0,0});
+						v.Rotate(-alignment.relativeAlignment.angle[1], {0,1,0});
 						r.setVector(v);
 					}
 					treeEntry.tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
@@ -378,9 +382,6 @@ void TrackCombiner::processTracks() {
 	treeBuffer.emptyBuffer();
 	cout<<"entries in tree "<<treeBuffer.GetEntries()<<endl;
 
-	timeWalkCorrection.calculateTimeWalk(&treeBuffer.getTree());
-	std::ofstream fout("timeWalkParameters.dat");
-	timeWalkCorrection.save(fout);
 
 }
 
@@ -431,6 +432,17 @@ TrackCombiner::MatchResult TrackCombiner::getAndMatchEntries(
 
 }
 
+void TrackCombiner::loadAlignment(std::string alignmentFile) {
+	alignment=Alignment(alignmentFile);
+}
+
+void TrackCombiner::saveAlignment(std::string alignmentFile) {
+	//calculate alignment
+	alignment.timeWalkCorrection.calculate(&treeBuffer.getTree());
+	alignment.relativeAlignment.calculate(&treeBuffer.getTree());
+
+	alignment.saveToFile(alignmentFile);
+}
 
 void TrackCombiner::printTriggers(int telescopeEntry, int tpcEntry) const {
 	const int printEveryN=1;

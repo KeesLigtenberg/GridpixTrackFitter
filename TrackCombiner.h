@@ -34,8 +34,6 @@
 
 #include "testBeamSetup.h"
 #include "mimosaAlignment.h"
-#include "relativeAlignment.h"
-
 
 class BufferedTreeFiller {
 public:
@@ -81,6 +79,8 @@ public:
 	void setTriggerOffset(int offset) { triggerOffset=offset; };
 	void setDisplayEvent(bool doDisplay=true) { displayEvent=doDisplay; };
 
+	void loadAlignment(std::string alignmentFile);
+	void saveAlignment(std::string alignmentFile);
 
 	void processTracks();
 
@@ -88,7 +88,7 @@ public:
 	void drawEvent(const T& hits,
 			const std::vector<FitResult3D>& fits);
 
-	TimeWalkCorrector timeWalkCorrection{  0.1 /*min ToT*/, 0.616349 /*mm/micros correction*/, 0.0566055, 0.4 /*shift all hits*/};
+	Alignment alignment;
 
 private:
 	enum class MatchResult { match, noMatch, end };

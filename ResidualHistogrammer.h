@@ -16,6 +16,7 @@
 
 #include "linearRegressionFit.h"
 #include "DetectorConfiguration.h"
+#include "getMeanFromGausFit.h"
 
 class ResidualHistogrammer {
 public:

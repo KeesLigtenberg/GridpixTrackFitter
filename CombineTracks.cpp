@@ -17,13 +17,11 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 
 	TrackCombiner combiner(mimosaInput, timepixInput);
 //	if(not displayEvent)
-		combiner.openFile("fitResults.root");
+	combiner.loadAlignment("alignment.dat");
+	combiner.openFile("fitResults.root");
 	combiner.setDisplayEvent(displayEvent);
-	{
-		std::ifstream fin("timeWalkParameters.dat");
-		combiner.timeWalkCorrection.load(fin);
-	}
 	combiner.processTracks();
+	combiner.saveAlignment("alignment.dat");
 
 }
 
