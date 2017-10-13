@@ -21,14 +21,16 @@ void TrackCombiner::drawEvent(const T& hits,
 	for(auto& f :tpcFits ) //telescopeTPCLines)
 		fitsInTimePixFrame.push_back(
 				f.makeShifted(-ra.shift)
-				 .makeRotated(-ra.angle[0], {0,-7,6}, {1,0,0})
-				 .makeRotated(-ra.angle[1], {11,0,6}, {0,1,0})
+				 .makeRotated(-ra.angle[2], ra.getCOM(), {0,0,1})
+				 .makeRotated(-ra.angle[0], ra.getCOM(), {1,0,0})
+				 .makeRotated(-ra.angle[1], ra.getCOM(), {0,1,0})
 				 .makeMirrorY() ); //
 	auto hitsInTimepixFrame=hits;
 	for(auto& h: hitsInTimepixFrame) {
 		h.SetPosition(h.getPosition() - ra.shift);
-		h.RotatePosition(-ra.angle[0], {0,-7,6}, {1,0,0});
-		h.RotatePosition(-ra.angle[1], {11,0,6}, {0,1,0});
+		h.RotatePosition(-ra.angle[2], ra.getCOM(), {0,0,1});
+		h.RotatePosition(-ra.angle[0], ra.getCOM(), {1,0,0});
+		h.RotatePosition(-ra.angle[1], ra.getCOM(), {0,1,0});
 		h.y=-h.y;
 	}
 	HoughTransformer::drawCluster(hitsInTimepixFrame, timePixChip);
@@ -112,8 +114,9 @@ int goesThroughTimepix(const FitResult3D& fit, const Alignment& alignment, const
 	for(double z : {dc.zmin(), dc.zmax() }) {
 		TVector3 telescopePoint{ fit.xAt(ra.shift.z()+z), fit.yAt(ra.shift.z()+z), ra.shift.z()+z };
 		telescopePoint-=ra.shift;
-		telescopePoint=RotateAroundPoint(telescopePoint,-ra.angle[0], {0,-7,6}, {1,0,0});
-		telescopePoint=RotateAroundPoint(telescopePoint,-ra.angle[1], {11,0,6}, {0,1,0});
+		telescopePoint=RotateAroundPoint(telescopePoint,-ra.angle[2], ra.getCOM(), {0,0,1});
+		telescopePoint=RotateAroundPoint(telescopePoint,-ra.angle[0], ra.getCOM(), {1,0,0});
+		telescopePoint=RotateAroundPoint(telescopePoint,-ra.angle[1], ra.getCOM(), {0,1,0});
 		telescopePoint.SetY( -telescopePoint.y() );
 		if( isInsideDetector( telescopePoint, timePixChip ) ) {
 			++nPlanes;
@@ -152,6 +155,7 @@ std::pair<HoughTransformer::HitCluster, HoughTransformer::HitCluster> splitClust
 
 void TrackCombiner::processTracks() {
 	const TVector3& timepixShift=alignment.relativeAlignment.shift;
+	const TVector3& rotationCOM=alignment.relativeAlignment.getCOM();
 
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(0);
@@ -204,8 +208,9 @@ void TrackCombiner::processTracks() {
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
-			h.RotatePosition(alignment.relativeAlignment.angle[1], {11,0,6}, {0,1,0});
-			h.RotatePosition(alignment.relativeAlignment.angle[0], {0,-7,6}, {1,0,0});
+			h.RotatePosition(alignment.relativeAlignment.angle[1], rotationCOM, {0,1,0});
+			h.RotatePosition(alignment.relativeAlignment.angle[0], rotationCOM, {1,0,0});
+			h.RotatePosition(alignment.relativeAlignment.angle[2], rotationCOM, {0,0,1});
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
@@ -295,6 +300,7 @@ void TrackCombiner::processTracks() {
 					//rotate back to frame of timepix
 					for(auto& r:residuals) {
 						auto v=r.getVector();
+						v.Rotate(-alignment.relativeAlignment.angle[2], {0,0,1});
 						v.Rotate(-alignment.relativeAlignment.angle[0], {1,0,0});
 						v.Rotate(-alignment.relativeAlignment.angle[1], {0,1,0});
 						r.setVector(v);

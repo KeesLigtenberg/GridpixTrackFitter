@@ -50,6 +50,8 @@ struct RelativeAligner {
 	void save(std::ostream&) const;
 	void load(std::istream&);
 
+	TVector3 getCOM() const { return timepixCOM-shift; };//COM in mirrored timepix frame!
+
 	TVector3 shift, timepixCOM; //com in telescope frame!
 	std::array<double, 3> angle; //X, Y, Z
 };
@@ -166,19 +168,28 @@ void RelativeAligner::calculate(TTree* tree) {
 		//angles
 		auto hist=getHistFromTree(tree, "timepixFits."+axis+"Z.slope", "fabs(timepixFits."+axis+"Z.slope)<0.2", "slopeHist"+axis, "goff" );
 		double mean=getMeanFromGausFit(*hist);
-		angle[i]+= std::atan( i==0 ? mean : -mean );
+		angle[i]+= std::atan( mean );
 
-		std::cout<<"added rotation is "<<std::atan(mean)<<"\n";
+		std::cout<<"added "<<axis<<"rotation is "<<std::atan(mean)<<"\n";
 	}
 	//Z axis rotation
 	auto comx=std::to_string(timepixCOM.x()), comy=std::to_string(timepixCOM.y());
 	auto zRotation=getHistFromTree(tree,
-			"-dyz*(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+")"
-			"+dxz*(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+")",
-			"", "zRotHist", "goff");
+			"(-dyz*(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+")"
+			"+dxz*(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+"))"
+			"/(pow(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+", 2)+pow(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+",2))",
+			"(pow(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+", 2)+pow(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+",2))"
+			"*(fabs("
+			"(-dyz*(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+")"
+			"+dxz*(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+"))"
+			"/(pow(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+", 2)+pow(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+",2))"
+			")<1)"
+			, "zRotHist", "");
 	double zAngle=getMeanFromGausFit(*zRotation);
-	angle[2]= zAngle;
-	std::cout<<"zrotation is "<<zAngle<<"\n";
+	angle[2]-=zAngle;
+	std::cout<<"added zrotation is "<<zAngle<<"\n";
+	gPad->Update();
+//	std::cin.get();
 }
 
 void RelativeAligner::load(std::istream& input) {
@@ -188,8 +199,12 @@ void RelativeAligner::load(std::istream& input) {
 		std::cerr<<"failed to read header RELATIVEALIGNMENT\n"; throw 1;
 	}
 	double x,y,z;
-	input>>x>>y>>z>>angle[0]>>angle[1]>>angle[2];
+	double comx, comy, comz;
+	input>>x>>y>>z
+		 >>comx>>comy>>comz
+		 >>angle[0]>>angle[1]>>angle[2];
 	shift.SetXYZ(x,y,z);
+	timepixCOM.SetXYZ(comx,comy,comz);
 	if(not input.good() ) {
 		std::cerr<<"failed to read parameters\n";
 		throw 1;
@@ -198,8 +213,10 @@ void RelativeAligner::load(std::istream& input) {
 
 void RelativeAligner::save(std::ostream& output) const {
 	output<<"RELATIVEALIGNMENT\n";
-	for(int i=0; i<3; i++) output<<shift[i]<<" ";
-	output<<"\n";
+	for(const auto& v : {shift, timepixCOM} ) {
+		for(int i=0; i<3; i++) output<<v[i]<<" ";
+		output<<"\n";
+	}
 	for(int i=0; i<3; i++) output<<angle[i]<<" ";
 	output<<"\n";
 }
