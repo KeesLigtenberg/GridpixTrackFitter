@@ -166,9 +166,10 @@ void RelativeAligner::calculate(TTree* tree) {
 		std::cout<<"additional shift is "<<shiftMean<<"\n";
 
 		//angles
-		auto hist=getHistFromTree(tree, "timepixFits."+axis+"Z.slope", "fabs(timepixFits."+axis+"Z.slope)<0.2", "slopeHist"+axis, "goff" );
+		const std::string rotaxis= i ? "X" : "Y";
+		auto hist=getHistFromTree(tree, "timepixFits."+rotaxis+"Z.slope", "fabs(timepixFits."+rotaxis+"Z.slope)<0.2", "slopeHist"+rotaxis, "goff" );
 		double mean=getMeanFromGausFit(*hist);
-		angle[i]+= std::atan( mean );
+		angle[i]+= std::atan( i ? -mean : mean );
 
 		std::cout<<"added "<<axis<<"rotation is "<<std::atan(mean)<<"\n";
 	}
@@ -184,12 +185,10 @@ void RelativeAligner::calculate(TTree* tree) {
 			"+dxz*(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+"))"
 			"/(pow(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+", 2)+pow(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+",2))"
 			")<1)"
-			, "zRotHist", "");
+			, "zRotHist", "goff");
 	double zAngle=getMeanFromGausFit(*zRotation);
 	angle[2]-=zAngle;
 	std::cout<<"added zrotation is "<<zAngle<<"\n";
-	gPad->Update();
-//	std::cin.get();
 }
 
 void RelativeAligner::load(std::istream& input) {
