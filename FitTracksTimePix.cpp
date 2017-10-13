@@ -26,19 +26,9 @@
 #include "TrackFitter.cpp"
 #endif
 
-using namespace std;
+#include "testBeamSetup.h"
 
-struct TimePixDetectorConfiguration : DetectorConfiguration {
-	static constexpr double driftSpeed=0.075; //mm/ns
-	TimePixDetectorConfiguration() : DetectorConfiguration{
-		1, {0}, //nplanes, planeposition
-		0.055, 256, 256 //pixelsize, xpixels, ypixels
-	} {};
-	virtual double xmin() const {return driftSpeed; }
-	virtual double xmax() const {return 400*driftSpeed; }
-	virtual double zmin() const {return 0; }
-	virtual double zmax() const {return 256*pixelsize; };
-} timePixChip;
+using namespace std;
 
 void FitTracksTimePix(std::string inputfile) {
 

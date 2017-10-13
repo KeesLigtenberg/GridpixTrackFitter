@@ -27,7 +27,7 @@ TimePixFitter::TimePixFitter(std::string inputfile, const DetectorConfiguration&
 	averageResidualFromSum{0,0}, //initialise to zero
 	rotationZFromSum(0),
 	slope1FromSum(0), slope2FromSum(0),
-	angle(0), shift(0,0)
+	shift(0,0)
 {
 
 	//get tree from file
@@ -78,7 +78,7 @@ std::vector<PositionHit>&  TimePixFitter::rotateAndShift(
 	std::vector<PositionHit>& spaceHit) {
 	//apply translation and rotation
 	spaceHit = translateHits(spaceHit, shift);
-	spaceHit = rotateHits(spaceHit, angle, hitsCentre);
+//	spaceHit = rotateHits(spaceHit, angle, hitsCentre);todo: do proper rotation!
 	return spaceHit;
 }
 
@@ -253,9 +253,7 @@ void TimePixFitter::setShift(
 		shift=shiftsIn;
 }
 
-void TimePixFitter::setAngle(double anglesIn) {
-	angle=anglesIn;
-}
+
 
 void TimePixFitter::addToShift(
 		const std::pair<double, double> & shiftsExtra) {
@@ -263,17 +261,10 @@ void TimePixFitter::addToShift(
 	shift.second+=shiftsExtra.second;
 }
 
-void TimePixFitter::addToAngle(double anglesExtra) {
-	angle+=anglesExtra;
-}
-
 const std::pair<double, double>& TimePixFitter::getShift() const {
 	return shift;
 }
 
-const double& TimePixFitter::getAngle() const {
-	return angle;
-}
 
 std::pair<double, double> TimePixFitter::getSlopes() const {
 	return {slope1FromSum, slope2FromSum};

@@ -50,7 +50,7 @@ struct RelativeAligner {
 	void save(std::ostream&) const;
 	void load(std::istream&);
 
-	TVector3 shift{0,0,0};
+	TVector3 shift{0,0,0}, timepixCOM{};
 	std::array<double, 2> angle;
 };
 

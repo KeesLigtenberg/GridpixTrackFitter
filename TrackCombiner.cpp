@@ -272,26 +272,26 @@ void TrackCombiner::processTracks() {
 					telescopeTPCLines.push_back(telescopeTPCLine);
 
 					//make alternative fit using an extra point in telescope
-					auto splitTpcCluster=splitCluster(tpcFittedClusters.at(iFit), [](const PositionHit& h) {
-						return h.column<128;
-//						return (h.column+h.row)%2;
-					});
-//					cout<<splittedTpcCluster.first.size()<<" - "<<splittedTpcCluster.second.size()<<"\n";
-					treeEntry.nfitted=splitTpcCluster.first.size();
-					treeEntry.nresiduals=splitTpcCluster.second.size();
-					if(splitTpcCluster.first.size()<1 or splitTpcCluster.second.size()<1) {
-						cout<<"split cluster has no hits!\n";
-						continue;
-					}
+//					auto splitTpcCluster=splitCluster(tpcFittedClusters.at(iFit), [](const PositionHit& h) {
+//						return h.column<128;
+////						return (h.column+h.row)%2;
+//					});
+////					cout<<splittedTpcCluster.first.size()<<" - "<<splittedTpcCluster.second.size()<<"\n";
+//					treeEntry.nfitted=splitTpcCluster.first.size();
+//					treeEntry.nresiduals=splitTpcCluster.second.size();
+//					if(splitTpcCluster.first.size()<1 or splitTpcCluster.second.size()<1) {
+//						cout<<"split cluster has no hits!\n";
+//						continue;
+//					}
+//
+//					PositionHit lastPlaneCrossing( telescopeFit.xAt(0), telescopeFit.yAt(0), 0 );
+//					lastPlaneCrossing.error2x=lastPlaneCrossing.error2y=1E-4;//=0.01mm
+//					splitTpcCluster.first.add( lastPlaneCrossing );
+//					auto combinedFit=regressionFit3d(splitTpcCluster.first);
+//					combinedFits.push_back(combinedFit);
+//					auto residuals=calculateResiduals( splitTpcCluster.second, combinedFit);
 
-					PositionHit lastPlaneCrossing( telescopeFit.xAt(0), telescopeFit.yAt(0), 0 );
-					lastPlaneCrossing.error2x=lastPlaneCrossing.error2y=1E-4;//=0.01mm
-					splitTpcCluster.first.add( lastPlaneCrossing );
-					auto combinedFit=regressionFit3d(splitTpcCluster.first);
-					combinedFits.push_back(combinedFit);
-					auto residuals=calculateResiduals( splitTpcCluster.second, combinedFit);
-
-//					auto residuals=calculateResiduals(tpcFittedClusters.at(iFit), telescopeFit);
+					auto residuals=calculateResiduals(tpcFittedClusters.at(iFit), telescopeFit);
 					//rotate back to frame of timepix
 					for(auto& r:residuals) {
 						auto v=r.getVector();
@@ -301,8 +301,8 @@ void TrackCombiner::processTracks() {
 					}
 					treeEntry.tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
 
-					average=splitTpcCluster.second.getAveragePosition();
-					auto& fit=combinedFit; //telescopeFit,combinedFit
+//					average=splitTpcCluster.second.getAveragePosition();
+					auto& fit=telescopeFit; //telescopeFit,combinedFit
 					treeEntry.dyz=(average.z()*fit.YZ.slope+fit.YZ.intercept-average.y())/sqrt(1+fit.YZ.slope*fit.YZ.slope);
 					treeEntry.dxz=(average.z()*fit.XZ.slope+telescopeFit.XZ.intercept-average.x())/sqrt(1+fit.XZ.slope*fit.XZ.slope);
 

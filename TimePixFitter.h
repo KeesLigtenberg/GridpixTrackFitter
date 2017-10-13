@@ -33,13 +33,11 @@ public:
 	std::pair<double,double> getMeans(); //not constant because adds fits!
 	const std::pair<double,double>& getShift() const;
 	double getRotation(); //not constant because adds fits!
-	const double& getAngle() const;
+//	const double& getAngle() const;
 	std::pair<double, double> getSlopes() const;
 
 	void setShift( const std::pair<double,double>& shift);
 	void addToShift( const std::pair<double,double>& shift );
-	void setAngle( double angles);
-	void addToAngle( double angles);
 	void setSlopes( std::pair<double, double> slopes);
 	int getEntry(int iEvent);
 
@@ -78,7 +76,6 @@ private:
 
 	pixelMask mask;
 	std::pair<double,double> shift;
-	double angle;
 	std::pair<double,double> hitsCentre, averageResidualFromSum;
 	double rotationZFromSum;
 
