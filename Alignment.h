@@ -41,17 +41,17 @@ private:
 
 
 struct RelativeAligner {
-	RelativeAligner(const TVector3& shift, double xangle, double yangle ) :
-		shift{shift}, angle{xangle,yangle} {}
-	RelativeAligner() : shift(0,0,0), angle{0,0} {};
+	RelativeAligner(const TVector3& shift,const TVector3& timepixCOM, double xangle, double yangle, double zangle ) :
+		shift{shift}, timepixCOM{timepixCOM}, angle{xangle,yangle, zangle} {}
+	RelativeAligner() : shift(0,0,0), timepixCOM{11,-7,6}, angle{0,0,0} {};
 
 	void calculate(TTree* tree);
 
 	void save(std::ostream&) const;
 	void load(std::istream&);
 
-	TVector3 shift{0,0,0}, timepixCOM{};
-	std::array<double, 2> angle;
+	TVector3 shift, timepixCOM; //com in telescope frame!
+	std::array<double, 3> angle; //X, Y, Z
 };
 
 struct Alignment {
@@ -128,7 +128,7 @@ void TimeWalkCorrector::calculate(TTree* tree) {
 		//subtract old correction in fit of new one:
 		TF1* fun=new TF1("fun", ("[0]/(x+[1])+[2]-"+scoef+"/(x+"+sToT+")").c_str() );
 
-		TFitResultPtr fit=prof->Fit(fun, "S", "", minToT, 100);
+		TFitResultPtr fit=prof->Fit(fun, "SQ", "", minToT, 100);
 		if(!fit->IsValid()) { std::cerr<<"Time walk fit failed!\n"; throw 1;}
 
 		std::cout<<"Updated time walk parameters\n"
@@ -139,11 +139,21 @@ void TimeWalkCorrector::calculate(TTree* tree) {
 	}
 
 void RelativeAligner::calculate(TTree* tree) {
+	//calculate COM
+	//fill histogram with average from each track and get average from that, i.e. weight each track, not each hit
+	for(int i=0; i<3; i++) {
+		const auto x = std::array<std::string,3>{"x", "y", "z"}[i];
+		auto xhist=getHistFromTree(tree, "Sum$(timepixHits."+x+")/Length$(timepixHits)", "", x+"hist", "goff" );
+		double xmean=getMeanFromGausFit(*xhist);
+		timepixCOM[i]=xmean;
+	}
+	std::cout<<"com="<<timepixCOM[0]<<" "<<timepixCOM[1]<<" "<<timepixCOM[2]<<"\n";
 	for(int i=0; i<2;i++) {
-		const std::string axis[2]={"X", "Y"};
+		const std::string axis= i ? "Y" : "X";
 		//intercepts
-		auto shiftHist=getHistFromTree(tree, "(telescopeFits[]."+axis[i]+"Z.intercept+telescopeFits[]."+axis[i]+"Z.slope*-374)-"
-			 "(timepixFits[0]."+axis[i]+"Z.intercept+timepixFits[0]."+axis[i]+"Z.slope*-374)", "", "shiftHist"+axis[i], "goff" );
+		auto zstring=std::to_string( timepixCOM.z() );//mean in Telescope frame -380+~6 =~-374
+		auto shiftHist=getHistFromTree(tree, "(telescopeFits[]."+axis+"Z.intercept+telescopeFits[]."+axis+"Z.slope*"+zstring+")-"
+			 "(timepixFits[0]."+axis+"Z.intercept+timepixFits[0]."+axis+"Z.slope*"+zstring+")", "", "shiftHist"+axis, "goff" );
 
 //		gPad->Update();
 //		std::cin.get();
@@ -154,12 +164,21 @@ void RelativeAligner::calculate(TTree* tree) {
 		std::cout<<"additional shift is "<<shiftMean<<"\n";
 
 		//angles
-		auto hist=getHistFromTree(tree, "timepixFits."+axis[i]+"Z.slope", "fabs(timepixFits."+axis[i]+"Z.slope)<0.2", "slopeHist"+axis[i] );
+		auto hist=getHistFromTree(tree, "timepixFits."+axis+"Z.slope", "fabs(timepixFits."+axis+"Z.slope)<0.2", "slopeHist"+axis, "goff" );
 		double mean=getMeanFromGausFit(*hist);
-		angle[i]+= i==0 ? mean : -mean;
+		angle[i]+= std::atan( i==0 ? mean : -mean );
 
-		std::cout<<"added rotation is "<<mean<<"\n";
+		std::cout<<"added rotation is "<<std::atan(mean)<<"\n";
 	}
+	//Z axis rotation
+	auto comx=std::to_string(timepixCOM.x()), comy=std::to_string(timepixCOM.y());
+	auto zRotation=getHistFromTree(tree,
+			"-dyz*(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+")"
+			"+dxz*(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+")",
+			"", "zRotHist", "goff");
+	double zAngle=getMeanFromGausFit(*zRotation);
+	angle[2]= zAngle;
+	std::cout<<"zrotation is "<<zAngle<<"\n";
 }
 
 void RelativeAligner::load(std::istream& input) {
@@ -169,7 +188,7 @@ void RelativeAligner::load(std::istream& input) {
 		std::cerr<<"failed to read header RELATIVEALIGNMENT\n"; throw 1;
 	}
 	double x,y,z;
-	input>>x>>y>>z>>angle[0]>>angle[1];
+	input>>x>>y>>z>>angle[0]>>angle[1]>>angle[2];
 	shift.SetXYZ(x,y,z);
 	if(not input.good() ) {
 		std::cerr<<"failed to read parameters\n";
@@ -180,7 +199,9 @@ void RelativeAligner::load(std::istream& input) {
 void RelativeAligner::save(std::ostream& output) const {
 	output<<"RELATIVEALIGNMENT\n";
 	for(int i=0; i<3; i++) output<<shift[i]<<" ";
-	output<<angle[0]<<" "<<angle[1]<<"\n";
+	output<<"\n";
+	for(int i=0; i<3; i++) output<<angle[i]<<" ";
+	output<<"\n";
 }
 
 
