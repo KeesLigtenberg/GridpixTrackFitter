@@ -203,8 +203,8 @@ void TrackCombiner::processTracks() {
 		if( !telescopeFitter.passEvent(telescopeHits) ) { replaceStatus(1, "less than 4 planes hit in telescope", tpcEntryNumber); continue;} //minimal 4 planes!
 		telescopeHits=telescopeFitter.rotateAndShift(telescopeHits);
 		for(auto&v:telescopeHits) for(auto&h:v) {
-			h.RotatePosition(-savedSlopes.first, {mimosa.getCentre().first,mimosa.getCentre().second,0}, {0,1,0} );
-			h.RotatePosition(savedSlopes.second, {mimosa.getCentre().first,mimosa.getCentre().second,0}, {1,0,0} );
+			h.RotatePosition(atan(-savedSlopes.first), {mimosa.getCentre().first,mimosa.getCentre().second,0}, {0,1,0} );
+			h.RotatePosition(atan(savedSlopes.second), {mimosa.getCentre().first,mimosa.getCentre().second,0}, {1,0,0} );
 		}
 		auto telescopeClusters = telescopeFitter.houghTransform(telescopeHits);
 		for( auto& cluster : telescopeClusters) {
