@@ -90,6 +90,8 @@ public:
 
 	Alignment alignment;
 
+	bool doSplitForResiduals=false;
+
 private:
 	enum class MatchResult { match, noMatch, end };
 	MatchResult getAndMatchEntries(int& telescopeEntry, int& tpcStartEntry);
