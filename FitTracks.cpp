@@ -100,7 +100,7 @@ void FitTracks (std::string inputfile, int nRepeatFit=5) {
 				}
 	}
 
-	telescopeFitter.saveAlignment("mimosaAlignment.h");
+	telescopeFitter.saveAlignment("alignment.dat");
 
 	//create and combine graphs
 	std::vector<TGraph*> shiftxGraph,shiftyGraph, rotationGraph;

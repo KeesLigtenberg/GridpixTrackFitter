@@ -4,19 +4,26 @@
  *  Created on: Jun 22, 2017
  *      Author: cligtenb
  */
+
 #include "TrackFitter.h"
 
-#include <fstream>
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <iterator>
+#include <list>
 
+#include "TFile.h"
+#include "TTree.h"
+#include "TVirtualPad.h"
+#include "TROOT.h"
 #include "TSystem.h"
-#include "TView.h"
 
-//#include "/user/cligtenb/rootmacros/getObjectFromFile.h"
+#include "Alignment.h"
+#include "DetectorConfiguration.h"
 #include "getObjectFromFile.h"
-#include "linearRegressionFit.h"
-#include "makeNoisyPixelMask.h"
-#include "transformHits.h"
 #include "ResidualHistogrammer.h"
+#include "transformHits.h"
 
 using namespace std;
 
@@ -320,29 +327,17 @@ void trackFitter::setSlopes(std::pair<double, double> slopes) {
 	houghTransform.angleOfTracksY=slopes.second;
 }
 
-void trackFitter::saveAlignment(std::string outputfile) {
-	ofstream fout(outputfile);
+void trackFitter::saveAlignment(std::string file) {
 
-	fout<<  "//this file contains the alignment parameters in c format\n"
-			"//include the file to load the parameters\n\n";
+	//load alignment parameter, because we need to save the other parameters in the same file
+	Alignment alignment(file);
 
-	fout<<"std::vector<std::pair<double,double>> savedShifts={ ";
-	for(auto s=shifts.begin(); s!=shifts.end();) {
-		fout<<"{"<<s->first<<", "<<s->second;
-		fout<< ( ++s==shifts.end() ? "} };\n" : "}, " );
-	}
-	fout<<"std::vector<double> savedAngles={ ";
-	for(auto r=angles.begin(); r!=angles.end();) {
-		fout<< (*r) ;
-		fout<< ( ++r==angles.end() ? " };\n" : ", " );
-	}
-	fout<<"std::vector<std::pair<double,double>> savedCOM={";
-	for(auto r=hitsCentre.begin(); r!=hitsCentre.end();) {
-		fout<<"{"<< r->first<<", "<<r->second<<"}"  ;
-		fout<< ( ++r==hitsCentre.end() ? " };\n" : ", " );
-	}
-	fout<<"std::pair<double,double> savedSlopes= {"<<houghTransform.angleOfTracksX<<", "<<houghTransform.angleOfTracksY<<"};"<<endl;
-	fout<<endl;
+	alignment.mimosa.shifts=shifts;
+	alignment.mimosa.COMs=hitsCentre;
+	alignment.mimosa.angles=angles;
+	alignment.mimosa.slopes={houghTransform.angleOfTracksX, houghTransform.angleOfTracksY};
+
+	alignment.saveToFile(file);
 }
 
 bool trackFitter::processDrawSignals() {

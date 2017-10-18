@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <array>
 
 #include "TTree.h"
@@ -24,7 +25,7 @@
 
 class TimeWalkCorrector {
 public:
-	TimeWalkCorrector() : minToT(0.), coefficient(0.), shiftToT(0.), shiftx(0.) {}
+	TimeWalkCorrector() : minToT(0.1), coefficient(0.06), shiftToT(0.4), shiftx(0.6) {}
 	TimeWalkCorrector(double minToT, double coefficient, double shiftt, double shiftx) :
 		minToT(minToT), shiftToT(shiftt), shiftx(shiftx), coefficient(coefficient)
 	{}
@@ -56,6 +57,18 @@ struct RelativeAligner {
 	std::array<double, 3> angle; //X, Y, Z
 };
 
+struct MimosaAligner {
+	void save(std::ostream&) const;
+	void load(std::istream&);
+
+	std::vector<std::pair<double,double>> shifts;
+	std::vector<std::pair<double,double>> COMs;
+	std::vector<double> angles;
+	std::pair<double,double> slopes;
+
+	int nplanes=6;
+};
+
 struct Alignment {
 	Alignment() {};
 	Alignment(std::string filename) {
@@ -66,6 +79,7 @@ struct Alignment {
 	void load(std::istream& fin) {
 		timeWalkCorrection.load(fin);
 		relativeAlignment.load(fin);
+		mimosa.load(fin);
 	}
 
 	void save(std::ostream& fout) const {
@@ -76,13 +90,19 @@ struct Alignment {
 		std::ofstream fout(filename);
 		timeWalkCorrection.save(fout);
 		relativeAlignment.save(fout);
+		mimosa.save(fout);
 	}
 
 	//class for keeping all alignment
 	TimeWalkCorrector timeWalkCorrection;
 	RelativeAligner relativeAlignment;
+	MimosaAligner mimosa;
 };
 
+//template<class T>
+//std::istream& operator>>(std::istream& is, std::pair<T,T> p) {
+//	return is>>p.first>>p.second;
+//}
 
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
 	spaceHit.erase(
@@ -212,14 +232,48 @@ void RelativeAligner::load(std::istream& input) {
 
 void RelativeAligner::save(std::ostream& output) const {
 	output<<"RELATIVEALIGNMENT\n";
-	for(const auto& v : {shift, timepixCOM} ) {
-		for(int i=0; i<3; i++) output<<v[i]<<" ";
+	for(const auto v : {&shift, &timepixCOM} ) {
+		for(int i=0; i<3; i++) output<<(*v)[i]<<" ";
 		output<<"\n";
 	}
 	for(int i=0; i<3; i++) output<<angle[i]<<" ";
 	output<<"\n";
 }
 
+void MimosaAligner::save(std::ostream& os) const {
+	os<<"MIMOSAALIGNMENT\n";
+	for(const auto& v : {shifts, COMs} ) {
+		for(const auto p : v ) {
+			os<<p.first<<" "<<p.second<<"\n";
+		}
+	}
+	for(const auto& i : angles) {
+		os<<i<<"\n";
+	}
+	os<<slopes.first<<" "<<slopes.second<<"\n";
+}
 
+void MimosaAligner::load(std::istream& input) {
+	std::string header;
+	input>>header;
+	if(header!="MIMOSAALIGNMENT" or not input.good()) {
+		std::cerr<<"failed to read header MIMOSAALIGNMENT\n"; throw 1;
+	}
+	for(auto v : {&shifts, &COMs} ) {
+		v->clear();
+		for(int i=0; i<nplanes; ++i ) {
+			double f, s;
+			input>>f>>s;
+			v->push_back({f,s});
+		}
+	}
+	angles.clear();
+	for(int i=0; i<nplanes; ++i) {
+		double a;
+		input>>a;
+		angles.push_back(a);
+	}
+	input>>slopes.first>>slopes.second;
+}
 
 #endif /* ALIGNMENT_H_ */
