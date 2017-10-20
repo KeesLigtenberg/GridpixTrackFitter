@@ -33,7 +33,6 @@
 #endif
 
 #include "testBeamSetup.h"
-#include "mimosaAlignment.h"
 
 class BufferedTreeFiller {
 public:

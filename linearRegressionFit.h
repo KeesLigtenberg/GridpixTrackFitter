@@ -80,8 +80,6 @@ struct FitResult3D {
 //	double phi, d0, tanlambda, z0;
 //};
 
-std::ostream& operator<<(std::ostream& os, FitResult3D& fit);
-
 FitResult3D regressionFit3d(const HoughTransformer::HitCluster& cluster, double interceptz=0);
 
 FitResult3D makeLinesParallelToZ(double x, double y) {
@@ -105,5 +103,10 @@ std::vector<Residual> calculateResiduals( const HoughTransformer::HitCluster& cl
 TVector3 averageResidual(const std::vector<Residual>& residuals);
 
 HoughTransformer::HitCluster& cutOnResiduals( HoughTransformer::HitCluster& cluster, const std::vector<Residual>& residuals, double maxResidual );
+
+inline
+std::ostream& operator<<(std::ostream& os, const FitResult3D& fit) {
+	return os<<"SimpleFitResult: slopes("<<fit.XZ.slope<<", "<<fit.YZ.slope<<") intercepts("<<fit.XZ.intercept<<", "<<fit.YZ.intercept<<","<<") at "<<fit.XZ.interceptz;
+}
 
 #endif /* LINEARREGRESSIONFIT_H_ */

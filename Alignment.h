@@ -166,6 +166,8 @@ void RelativeAligner::calculate(TTree* tree) {
 	for(int i=0; i<3; i++) {
 		const auto x = std::array<std::string,3>{"x", "y", "z"}[i];
 		auto xhist=getHistFromTree(tree, "Sum$(timepixHits."+x+")/Length$(timepixHits)", "", x+"hist", "goff" );
+//		gPad->Update();
+//		std::cin.get();
 		double xmean=getMeanFromGausFit(*xhist);
 		timepixCOM[i]=xmean;
 	}
@@ -176,10 +178,8 @@ void RelativeAligner::calculate(TTree* tree) {
 		auto zstring=std::to_string( timepixCOM.z() );//mean in Telescope frame -380+~6 =~-374
 		auto shiftHist=getHistFromTree(tree, "(telescopeFits[]."+axis+"Z.intercept+telescopeFits[]."+axis+"Z.slope*"+zstring+")-"
 			 "(timepixFits[0]."+axis+"Z.intercept+timepixFits[0]."+axis+"Z.slope*"+zstring+")", "", "shiftHist"+axis, "goff" );
-
 //		gPad->Update();
 //		std::cin.get();
-
 		double shiftMean=getMeanFromGausFit(*shiftHist);
 		shift[i]+=shiftMean;
 
@@ -188,6 +188,8 @@ void RelativeAligner::calculate(TTree* tree) {
 		//angles
 		const std::string rotaxis= i ? "X" : "Y";
 		auto hist=getHistFromTree(tree, "timepixFits."+rotaxis+"Z.slope", "fabs(timepixFits."+rotaxis+"Z.slope)<0.2", "slopeHist"+rotaxis, "goff" );
+//		gPad->Update();
+//		std::cin.get();
 		double mean=getMeanFromGausFit(*hist);
 		angle[i]+= std::atan( i ? -mean : mean );
 

@@ -18,7 +18,7 @@ void TrackCombiner::drawEvent(const T& hits,
 	timepixCanv->cd();
 	auto& ra=alignment.relativeAlignment;
 	vector<FitResult3D> fitsInTimePixFrame;
-	for(auto& f :tpcFits ) //telescopeTPCLines)
+	for(auto& f :fits ) //telescopeTPCLines)
 		fitsInTimePixFrame.push_back(
 				f.makeShifted(-ra.shift)
 				 .makeRotated(-ra.angle[2], ra.getCOM(), {0,0,1})
@@ -48,9 +48,9 @@ TrackCombiner::TrackCombiner(std::string mimosaInput, std::string timepixInput, 
 	tpcFitter(timepixInput,tpc)
 {
 	telescopeFitter.makeMask(5e3);
-	telescopeFitter.setShifts( savedShifts ); //xy shift of planes
-	telescopeFitter.setAngles( savedAngles ); //planes rotation along rz-axis in xy plane
-	telescopeFitter.setCentres( savedCOM );
+	telescopeFitter.setShifts( alignment.mimosa.shifts ); //xy shift of planes
+	telescopeFitter.setAngles( alignment.mimosa.angles ); //planes rotation along rz-axis in xy plane
+	telescopeFitter.setCentres( alignment.mimosa.COMs );
 //	telescopeFitter.setSlopes( savedSlopes ); //slope along rz, undone later by rotation of all hits
 
 	tpcFitter.makeMask(1e3);
@@ -183,15 +183,14 @@ void TrackCombiner::processTracks() {
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(0);
 	for(int telescopeEntryNumber=0,tpcEntryNumber=0;
-//			i<100000
+			telescopeEntryNumber<100000
 			;) {
-
 		triggerStatusHistogram.reset();
-
 		// Get Entry and match trigger Numbers
 		auto matchStatus=getAndMatchEntries(telescopeEntryNumber,tpcEntryNumber);
-//		printTriggers(telescopeEntryNumber,tpcEntryNumber);
+		printTriggers(telescopeEntryNumber,tpcEntryNumber);
 //		if( cin.get()=='q') break;
+//		if(!(telescopeEntryNumber%100000)) cout<<"entry "<<telescopeEntryNumber<<endl;
 		if( matchStatus == MatchResult::end ) break;
 		else if( matchStatus == MatchResult::noMatch) continue;
 
@@ -203,8 +202,8 @@ void TrackCombiner::processTracks() {
 		if( !telescopeFitter.passEvent(telescopeHits) ) { replaceStatus(1, "less than 4 planes hit in telescope", tpcEntryNumber); continue;} //minimal 4 planes!
 		telescopeHits=telescopeFitter.rotateAndShift(telescopeHits);
 		for(auto&v:telescopeHits) for(auto&h:v) {
-			h.RotatePosition(atan(-savedSlopes.first), {mimosa.getCentre().first,mimosa.getCentre().second,0}, {0,1,0} );
-			h.RotatePosition(atan(savedSlopes.second), {mimosa.getCentre().first,mimosa.getCentre().second,0}, {1,0,0} );
+			h.RotatePosition(atan(-alignment.mimosa.slopes.first), {mimosa.getCentre().first,mimosa.getCentre().second,0}, {0,1,0} );
+			h.RotatePosition(atan(alignment.mimosa.slopes.second), {mimosa.getCentre().first,mimosa.getCentre().second,0}, {1,0,0} );
 		}
 		auto telescopeClusters = telescopeFitter.houghTransform(telescopeHits);
 		for( auto& cluster : telescopeClusters) {
@@ -247,6 +246,7 @@ void TrackCombiner::processTracks() {
 //			cout<<cluster.size();
 			cluster=cutOnResiduals(cluster, residuals, 1 /*mm*/);
 //			cout<<" - "<<cluster.size()<<"\n";
+			if(cluster.size()<2) continue;
 			fit=regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			tpcFits.push_back(fit);
@@ -258,6 +258,17 @@ void TrackCombiner::processTracks() {
 		}
 
 //		cout<<"timepix passed!"<<endl;
+
+		//display event
+		if( displayEvent ) { // and tpcHits.size()>300 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
+			drawEvent(tpcHits, telescopeFits);
+//			drawEvent(tpcFittedClusters.front(), tpcFits);
+//			{	HoughTransformer::drawCluster(tpcHits, combinedSetupForDrawing);
+//				for (auto& f : telescopeFits)
+//					f.draw(combinedSetupForDrawing.zmin(), combinedSetupForDrawing.zmax());
+//				gPad->Update(); }
+			if( telescopeFitter.processDrawSignals()  ) break;
+		}
 
 		//make new entry
 		BufferedTreeFiller::TreeEntry treeEntry;
@@ -328,6 +339,9 @@ void TrackCombiner::processTracks() {
 					telescopeFitIsMatched[jFit]=true;
 					tpcFitIsMatched[iFit]=true;
 					break;
+				} else if (displayEvent) {
+					std::cout<<"rejected with differences: "<<tpcFit.xAt(timepixShift.z()+timePixChip.zmean())-telescopeFit.xAt(timepixShift.z()+timePixChip.zmean())
+						<<", "<<tpcFit.yAt(timepixShift.z()+timePixChip.zmean())-telescopeFit.yAt(timepixShift.z()+timePixChip.zmean())<<"\n";
 				}
 			}
 		}
@@ -348,12 +362,6 @@ void TrackCombiner::processTracks() {
 
 		if(not atLeastOneThroughDetector) cerr<<"fit did not go through detector but did match!?"<<endl;
 
-		//display event
-		if( displayEvent and tpcHits.size()>300 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
-			drawEvent(tpcHits, telescopeFits);
-			drawEvent(tpcFittedClusters.front(), telescopeTPCLines);
-			if( telescopeFitter.processDrawSignals()  ) break;
-		}
 
 		//check if tpcEntry already has a matching fit
 		if( find(tpcEntryHasMatchingFit.begin(), tpcEntryHasMatchingFit.end(), tpcEntryNumber )!=tpcEntryHasMatchingFit.end() ) {
@@ -394,7 +402,7 @@ void TrackCombiner::processTracks() {
 
 	}
 
-	cout<<"highest telescope trigger (number of unique) "<< telescopeFitter.triggerNumberEnd<<" ("<<nTelescopeTriggers<<")"<<endl;
+	cout<<"highest telescope trigger (number of unique telescope triggers) "<< telescopeFitter.triggerNumberEnd<<" ("<<nTelescopeTriggers<<")"<<endl;
 	cout<<"number of entries in timepix "<<tpcFitter.nEvents<<endl;
 
 	treeBuffer.emptyBuffer();
@@ -407,27 +415,30 @@ TrackCombiner::MatchResult TrackCombiner::getAndMatchEntries(
 		int& telescopeEntry,
 		int& tpcStartEntry) {
 
-	//if previous frame did not increase and this frame did not increase, there is no related trigger to this frame
-//	if(previous2TriggerNumberBegin==telescopeFitter.triggerNumberEnd) { cout<<"unrelated!"<<endl; }
-//		triggerStatusHistogram.Fill("Unrelated telescope frame",1); return MatchResult::noMatch; }
+	//use modulus offset instead of doing actual modulus, to continue counting after 32768
+	long long modulusOffset=32768*int((tpcFitter.triggerNumber+triggerOffset)/32768);
 
-	//if triggerNumberBegin decreased, we must get entries until the tpc triggernumber also decreases
-	if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin)
+	//if telescope triggerNumberBegin decreased, and tpc did not already pass this boundary
+	//then we must get entries until the tpc triggernumber also passes the 32768 boundary ( is larger or equal to new trigger number)
+	if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin
+			and not (tpcFitter.triggerNumber+triggerOffset+modulusOffset<100) )
 		do {
 			if( !tpcFitter.getEntry(tpcStartEntry++) ) return MatchResult::end;
 		} while ( (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin );
 
 	//get next entry until tpc trigger number is larger than or equal to begin
+	//or until the tpc trigger number decreases;
 	do {
 		if( !tpcFitter.getEntry(tpcStartEntry++) ) return MatchResult::end;
-	} while( (tpcFitter.triggerNumber+triggerOffset) % 32768 < telescopeFitter.triggerNumberBegin );
+	} while( (tpcFitter.triggerNumber+triggerOffset-modulusOffset) < telescopeFitter.triggerNumberBegin
+			and telescopeFitter.triggerNumberBegin - (tpcFitter.triggerNumber+triggerOffset-modulusOffset)<100 );
 
 	//if also larger than end: reached the end of this telescope frame, continue with next telescope frame;
-	if( (tpcFitter.triggerNumber+triggerOffset) % 32768 > telescopeFitter.triggerNumberEnd) {
+	if( (tpcFitter.triggerNumber+triggerOffset-modulusOffset) > telescopeFitter.triggerNumberEnd) {
 //		triggerStatusHistogram.Fill("Trigger numbers do not match", 1);
 
 		frameStatusHistogram.reset();
-		nTelescopeTriggers+=telescopeFitter.triggerNumberEnd-previousTriggerNumberEnd;
+		nTelescopeTriggers+=max(0,telescopeFitter.triggerNumberEnd-previousTriggerNumberEnd);
 
 		previousTriggerNumberBegin=telescopeFitter.triggerNumberBegin;
 		previousTriggerNumberEnd=telescopeFitter.triggerNumberEnd;
@@ -463,7 +474,7 @@ void TrackCombiner::saveAlignment(std::string alignmentFile) {
 }
 
 void TrackCombiner::printTriggers(int telescopeEntry, int tpcEntry) const {
-	const int printEveryN=1;
+	const int printEveryN=10000;
 	if( !(telescopeEntry%printEveryN) ) {
 		cout<<"entry: "<<telescopeEntry<<"/"<<telescopeFitter.nEvents<<" ";
 		cout<<"triggers: "<<telescopeFitter.triggerNumberBegin<<"-"<<telescopeFitter.triggerNumberEnd;

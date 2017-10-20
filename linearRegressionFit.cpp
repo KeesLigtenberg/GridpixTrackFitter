@@ -180,6 +180,3 @@ TVector3 averageResidual(const std::vector<Residual>& residuals) {
 			 y/=residuals.size(),
 			 z/=residuals.size() };
 }
-std::ostream& operator <<(std::ostream& os, FitResult3D& fit) {
-	return os<<"SimpleFitResult: slopes("<<fit.XZ.slope<<", "<<fit.YZ.slope<<") intercepts("<<fit.XZ.intercept<<", "<<fit.YZ.intercept<<")";
-}

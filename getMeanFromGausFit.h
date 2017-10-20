@@ -17,7 +17,7 @@ inline double getMeanFromSimpleGausFit( TH1& hist ) {
 	return fitresult->Parameter(1);
 }
 inline double getParameterFromFit( TH1& hist, TF1& fit, int param) {
-	fit.SetParameters(hist.GetEntries()/hist.GetNbinsX()*2, hist.GetMean(),10*hist.GetBinWidth(1) ); //estimates with the correct order of magnitude
+	fit.SetParameters(hist.GetEntries()/hist.GetNbinsX()*5, hist.GetMean(), hist.GetStdDev() ); //estimates with the correct order of magnitude
 	TFitResultPtr fitresult=hist.Fit(&fit, "MSQ"); //More(try to find more than one minimum), Store and Quiet
 	if(!fitresult->IsValid()) {
 		std::cerr<< "getParameterFromFit error: failed to fit histogram "<<hist.GetName()<<std::endl;

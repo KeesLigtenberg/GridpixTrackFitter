@@ -29,5 +29,10 @@ const DetectorConfiguration mimosa= {
 	1153, 577 //row, column, ://one extra because exampleData starts at 1 and our data starts at 0 //TODO: change this to one or the other!
 };
 
+DetectorConfiguration combinedSetupForDrawing {
+		2, {-350,200 }, //nplanes, planeposition
+		0.001, int(1000*mimosa.xmax()), int(1000*mimosa.ymax()) //pixelsize, xpixels, ypixels
+	};
+
 
 #endif /* TESTBEAMSETUP_H_ */
