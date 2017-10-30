@@ -8,12 +8,13 @@
 #ifndef LINEARREGRESSIONFIT_H_
 #define LINEARREGRESSIONFIT_H_
 
-#include <array>
+#include <vector>
 
 #include <TVector3.h>
 #include "TPolyLine3D.h"
 
 #include "HoughTransformer.h"
+#include "PositionHit.h"
 
 struct FitResult2D {
 	FitResult2D( double slope, double intercept, std::vector<double> error, double interceptz=0 ):
@@ -90,13 +91,6 @@ FitResult3D makeLinesParallelToZ(double x, double y) {
 }
 
 //TrackFitResult linearRegressionTrackFit(const HoughTransformer::HitCluster& cluster);
-
-struct Residual {
-	double x,y,z;
-	const PositionHit& h;
-	TVector3 getVector() { return TVector3(x,y,z); };
-	void setVector(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };
-};
 
 Residual calculateResidual( const PositionHit& h, const FitResult3D& fit );
 std::vector<Residual> calculateResiduals( const HoughTransformer::HitCluster& cluster, const FitResult3D& fit);

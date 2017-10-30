@@ -29,6 +29,14 @@ struct PositionHit {
 	};
 };
 
+struct Residual {
+	double x,y,z;
+	const PositionHit& h;
+	TVector3 getVector() { return TVector3(x,y,z); };
+	void setVector(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };
+};
+
+
 inline std::vector<PositionHit> convertHits(const std::vector<Hit>& hv, double planePosition, double pixelwidth, double pixelheight, int plane=0) {
 		std::vector<PositionHit> phv;
 		for(auto& h : hv) {

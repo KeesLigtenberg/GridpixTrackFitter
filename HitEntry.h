@@ -8,6 +8,8 @@
 #ifndef HITENTRY_H_
 #define HITENTRY_H_
 
+#include "PositionHit.h"
+
 struct HitEntry {
 	HitEntry() : rx(), ry(), rz(),x(),y(),z(), ToT(), row(), col() {};
 	HitEntry(const Residual& r) :

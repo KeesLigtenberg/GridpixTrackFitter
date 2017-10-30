@@ -81,8 +81,8 @@ void BufferedTreeFiller::Write() {
 }
 
 void BufferedTreeFiller::setTreeBranches() {
-	fitResultTree.Branch("telescopeFits", &currentEntry.telescopeFits);
-	fitResultTree.Branch("timepixFits", &currentEntry.tpcFits);
+	fitResultTree.Branch("telescopeFits", "std::vector<FitResult3D>", &currentEntry.telescopeFits);
+	fitResultTree.Branch("timepixFits", "std::vector<FitResult3D>", &currentEntry.tpcFits);
 	fitResultTree.Branch("ntimepixHits", &currentEntry.ntpcHits);
 	fitResultTree.Branch("ntelescopeHits", &currentEntry.ntelescopeHits);
 	fitResultTree.Branch("timepixClusterSize", &currentEntry.tpcClusterSize);
@@ -211,7 +211,7 @@ void TrackCombiner::processTracks() {
 			auto fit=regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			auto residuals=calculateResiduals(cluster, fit);
-			cluster=cutOnResiduals(cluster, residuals, 0.5 /*mm*/);
+			cluster=cutOnResiduals(cluster, residuals, 0.7 /*mm*/);
 			if(cluster.size()<4  or cluster.getNPlanesHit()<=3) { replaceStatus(1, "less than 4 planes hit in telescope", tpcEntryNumber); continue;}
 			fit=regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
@@ -244,7 +244,7 @@ void TrackCombiner::processTracks() {
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			auto residuals=calculateResiduals(cluster, fit);
 //			cout<<cluster.size();
-			cluster=cutOnResiduals(cluster, residuals, 1 /*mm*/);
+			cluster=cutOnResiduals(cluster, residuals, 0.5 /*mm*/);
 //			cout<<" - "<<cluster.size()<<"\n";
 			if(cluster.size()<2) continue;
 			fit=regressionFit3d(cluster);
@@ -312,8 +312,8 @@ void TrackCombiner::processTracks() {
 
 					//make alternative fit using an extra point in telescope
 					auto splitTpcCluster=splitCluster(tpcFittedClusters.at(iFit), [](const PositionHit& h) {
-						return h.column<128;
-//						return (h.column+h.row)%2;
+//						return h.column<128;
+						return (h.column+h.row)%2;
 					});
 //					cout<<splittedTpcCluster.first.size()<<" - "<<splittedTpcCluster.second.size()<<"\n";
 					treeEntry.nfitted=splitTpcCluster.first.size();
@@ -332,7 +332,7 @@ void TrackCombiner::processTracks() {
 					if(doSplitForResiduals) {
 						putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);
 					} else {
-						putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), telescopeFit, alignment);
+						putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcFit, alignment);
 					}
 
 					++nmatched;
