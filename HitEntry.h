@@ -23,10 +23,10 @@ struct HitEntry {
 		row(r.h.row),
 		col(r.h.column)
 	{};
-	double rx, ry, rz;
-	double x, y, z;
-	int ToT;
-	int row, col;
+	double rx, ry, rz; //residuals in timepix frame
+	double x, y, z; //position in telescope frame
+	int ToT; //ToT in [0.025 ns]
+	int row, col; //row col of hit
 };
 #pragma link C++ class std::vector<HitEntry>+;
 #pragma link C++ class std::vector< std::vector<HitEntry> >+;

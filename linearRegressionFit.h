@@ -61,6 +61,8 @@ struct FitResult3D {
 		return {XZ, YZ.makeMirror()};
 	}
 	FitResult3D makeRotated(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis ) const;
+
+	ClassDef(FitResult3D, 1);
 };
 
 

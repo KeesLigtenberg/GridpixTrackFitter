@@ -9,6 +9,7 @@
 
 #include "linearRegressionFit.h"
 
+ClassImp(FitResult3D);
 
 void FitResult3D::draw(double zmin, double zmax) const {
 	const int npoints=2;
