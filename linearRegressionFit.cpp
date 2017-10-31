@@ -170,6 +170,8 @@ HoughTransformer::HitCluster&  cutOnResiduals( HoughTransformer::HitCluster& clu
 //	std::cout<<"Removed "<<nremoved<<" hits"<<std::endl;
 	return cluster;
 }
+
+
 TVector3 averageResidual(const std::vector<Residual>& residuals) {
 	double x=0, y=0, z=0;
 	for(auto& r: residuals) {
@@ -180,4 +182,20 @@ TVector3 averageResidual(const std::vector<Residual>& residuals) {
 	return { x/=residuals.size(),
 			 y/=residuals.size(),
 			 z/=residuals.size() };
+}
+
+HoughTransformer::HitCluster& cutOnResidualPulls(
+		HoughTransformer::HitCluster& cluster,
+		const std::vector<Residual>& residuals, double maxPull) {
+	auto res=residuals.begin();
+	int nremoved=cluster.size();
+	//no erase necessary because list version of remove_if
+	cluster.remove_if( [&res, &maxPull](const PositionHit&h){
+		bool cut= res->x*res->x/h.error2x > maxPull*maxPull or res->y*res->y/h.error2y > maxPull*maxPull;
+		++res;
+		return cut;
+	} );
+	nremoved-=cluster.size();
+//	std::cout<<"Removed "<<nremoved<<" hits"<<std::endl;
+	return cluster;
 }

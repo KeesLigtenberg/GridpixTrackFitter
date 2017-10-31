@@ -257,7 +257,7 @@ void TrackCombiner::processTracks() {
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			auto residuals=calculateResiduals(cluster, fit);
 //			cout<<cluster.size();
-			cluster=cutOnResiduals(cluster, residuals, 1. /*mm*/);
+			cluster=cutOnResidualPulls(cluster, residuals, 2);
 //			cout<<" - "<<cluster.size()<<"\n";
 			if(cluster.size()<2) continue;
 			fit=regressionFit3d(cluster);
