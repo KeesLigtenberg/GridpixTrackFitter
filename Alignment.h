@@ -69,6 +69,17 @@ struct MimosaAligner {
 	int nplanes=6;
 };
 
+struct ToTCorrector {
+	void load(std::istream&);
+	void load(std::string filename);
+
+	std::vector<PositionHit>&  correct(std::vector<PositionHit>& spaceHit) const;
+
+	static const int ncols=256;
+	int firstCol, lastCol;
+	std::array<double, ncols> correction;
+};
+
 struct Alignment {
 	Alignment() {};
 	Alignment(std::string filename) {
@@ -103,7 +114,13 @@ struct Alignment {
 //std::istream& operator>>(std::istream& is, std::pair<T,T> p) {
 //	return is>>p.first>>p.second;
 //}
-
+void checkHeader( std::istream& input, std::string name) {
+	std::string header;
+	input>>header;
+	if(header!=name or not input.good()) {
+		std::cerr<<"failed to read header "<<name<<"\n"; throw 1;
+	}
+}
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
 	spaceHit.erase(
 			std::remove_if(spaceHit.begin(), spaceHit.end(), [this](const PositionHit&h) {return (h.ToT*0.025) <minToT;} ),
@@ -276,6 +293,33 @@ void MimosaAligner::load(std::istream& input) {
 		angles.push_back(a);
 	}
 	input>>slopes.first>>slopes.second;
+}
+
+void ToTCorrector::load(std::istream& in) {
+	checkHeader(in, "TOTCORRECTION");
+	int nColsInFile=0;
+	in>>nColsInFile;
+	if(nColsInFile != ncols) {
+		std::cerr<<"Found "<<nColsInFile<<" in file, but expected "<<ncols<<"\n";
+	}
+	in>>firstCol>>lastCol;
+	for(int i=0; i<ncols; i++) {
+		in>>correction[i];
+	}
+}
+
+void ToTCorrector::load(std::string filename) {
+	std::ifstream in(filename.c_str());
+	load(in);
+}
+
+std::vector<PositionHit>& ToTCorrector::correct(
+		std::vector<PositionHit>& spaceHit) const {
+	for(auto& h : spaceHit) {
+		double factor=correction[ std::min(std::max(h.column,firstCol), lastCol) ];
+		h.ToT/=factor;
+	}
+	return spaceHit;
 }
 
 #endif /* ALIGNMENT_H_ */

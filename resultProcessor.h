@@ -52,7 +52,7 @@ public :
    TBranch        *b_nresiduals;   //!
    TBranch        *b_nfitted;   //!
 
-   resultProcessor(TTree *tree);
+   resultProcessor(TTree *tree=nullptr);
    virtual ~resultProcessor();
    virtual Int_t    Cut(Long64_t entry);
    virtual Int_t    GetEntry(Long64_t entry);

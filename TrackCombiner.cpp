@@ -189,6 +189,7 @@ std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 void TrackCombiner::processTracks() {
 	const TVector3& timepixShift=alignment.relativeAlignment.shift;
 	const TVector3& rotationCOM=alignment.relativeAlignment.getCOM();
+	ToTCorrector ToTCorrection; ToTCorrection.load("ToTCorrection.dat");
 
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(0);
@@ -236,7 +237,8 @@ void TrackCombiner::processTracks() {
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits); //just a shift!
-//		tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
+		tpcHits=ToTCorrection.correct(tpcHits);
+		tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
 		tpcHits=setTPCErrors(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {

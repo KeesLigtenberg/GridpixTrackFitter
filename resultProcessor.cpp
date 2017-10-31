@@ -2,6 +2,7 @@
 #include <TH2.h>
 #include <TStyle.h>
 #include <TCanvas.h>
+#include "TProfile2D.h"
 
 resultProcessor::resultProcessor(TTree *tree) : fChain(0)
 {
@@ -9,6 +10,9 @@ resultProcessor::resultProcessor(TTree *tree) : fChain(0)
 // used to generate this class and read the Tree.
    if (tree == 0) {
       TFile *f = (TFile*)gROOT->GetListOfFiles()->FindObject("fitResults.root");
+      if (!f || !f->IsOpen()) {
+    	  f=TFile::Open("fitResults.root", "READ");
+      }
       if (!f || !f->IsOpen()) {
          std::cerr<<"could not find file!"<<std::endl;
          throw 1;
@@ -99,43 +103,52 @@ Int_t resultProcessor::Cut(Long64_t entry)
 // This function may be called from Loop.
 // returns  1 if entry is accepted.
 // returns -1 otherwise.
+   if(timepixClusterSize->front()/double(ntimepixHits)<0.80) return -1;
+   if(timepixClusterSize->front()<30 or timepixClusterSize->front()>300) return -1;
+
    return 1;
 }
 
 void resultProcessor::Loop()
 {
-//   In a ROOT session, you can do:
-//      root> .L resultProcessor.C
-//      root> resultProcessor t
-//      root> t.GetEntry(12); // Fill t data members with entry number 12
-//      root> t.Show();       // Show values of entry 12
-//      root> t.Show(16);     // Read and show values of entry 16
-//      root> t.Loop();       // Loop on all entries
-//
-
-//     This is the loop skeleton where:
-//    jentry is the global entry number in the chain
-//    ientry is the entry number in the current Tree
-//  Note that the argument to GetEntry must be:
-//    jentry for TChain::GetEntry
-//    ientry for TTree::GetEntry and TBranch::GetEntry
-//
-//       To read only selected branches, Insert statements like:
-// METHOD1:
-//    fChain->SetBranchStatus("*",0);  // disable all branches
-//    fChain->SetBranchStatus("branchname",1);  // activate branchname
-// METHOD2: replace line
-//    fChain->GetEntry(jentry);       //read all branches
-//by  b_branchname->GetEntry(ientry); //read only this branch
    if (fChain == 0) return;
-
    Long64_t nentries = fChain->GetEntriesFast();
+
+   TFile output("histograms.root", "RECREATE");
+
+   TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
+
+   TProfile2D deformationsy("deformationsy", "profile of y residuals", 64, 0, 256, 64, 0, 256, -1, 1);
+   TProfile2D deformationsx("deformationsx", "profile of x residuals", 64, 0, 256, 64, 0, 256, -1, 1);
+   TH2D diffusionx("diffusionx", "x residuals as a function of drift distance", 50,4,20,40,-2,2);
+   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance", 50,4,20,40,-2,2);
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       nb = fChain->GetEntry(jentry);   nbytes += nb;
-      // if (Cut(ientry) < 0) continue;
+       if (Cut(ientry) < 0) continue;
+
+      for(auto& h : timepixHits->front() ) {
+    	  if(h.ToT*0.025<0.2) continue;
+    	  deformationsx.Fill(h.row+h.ry/.055, h.col+h.rz/.055, h.rx );
+    	  deformationsy.Fill(h.row+h.ry/.055, h.col+h.rz/.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
+
+    	  diffusiony.Fill(h.x-h.rx, h.ry);
+    	  diffusionx.Fill(h.x-h.rx, h.rx);
+
+    	  ToTByCol.Fill(h.col, h.ToT*0.025);
+      }
+
    }
+   gStyle->SetPalette(1);
+
+   for(auto d : {&deformationsy, &deformationsx} ) {
+	   d->SetMinimum(-0.1);
+	   d->SetMaximum(0.1);
+   }
+   deformationsy.DrawClone("colz");
+
+   output.Write();
 }
