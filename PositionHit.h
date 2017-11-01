@@ -19,6 +19,7 @@ struct PositionHit {
 	int row, column, plane;
 	int ToT=1;
 	double error2x=1, error2y=1;
+	int flag=1;
 
 	TVector3 getPosition() const { return {x,y,z}; };
 	void SetPosition(const TVector3& v) { x=v.x(); y=v.y(); z=v.z(); };

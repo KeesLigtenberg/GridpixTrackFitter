@@ -11,7 +11,7 @@
 #include "PositionHit.h"
 
 struct HitEntry {
-	HitEntry() : rx(), ry(), rz(),x(),y(),z(), ToT(), row(), col() {};
+	HitEntry() : rx(), ry(), rz(),x(),y(),z(), ToT(), row(), col(), flag() {};
 	HitEntry(const Residual& r) :
 		rx(r.x),
 		ry(r.y),
@@ -21,12 +21,14 @@ struct HitEntry {
 		z(r.h.z),
 		ToT(r.h.ToT),
 		row(r.h.row),
-		col(r.h.column)
+		col(r.h.column),
+		flag(r.h.flag)
 	{};
 	double rx, ry, rz; //residuals in timepix frame
 	double x, y, z; //position in telescope frame
 	int ToT; //ToT in [0.025 ns]
 	int row, col; //row col of hit
+	int flag;
 };
 #pragma link C++ class std::vector<HitEntry>+;
 #pragma link C++ class std::vector< std::vector<HitEntry> >+;

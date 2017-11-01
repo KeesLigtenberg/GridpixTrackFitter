@@ -52,6 +52,7 @@ FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double int
     double sumW = 0;
 
     for(const auto& h : cluster) {
+    	if(h.flag<0) continue;
     	double errorx2=h.error2x;
     	double hiz=h.z-interceptz;
 		sumX += h.x/errorx2;
@@ -96,6 +97,7 @@ FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double int
     double sumW = 0;
 
     for(auto& h : cluster) {
+    	if(h.flag<0) continue;
     	double errory2=h.error2y;//add error!
     	double hiz=h.z-interceptz;
 		sumY += h.y/errory2;
@@ -186,15 +188,21 @@ TVector3 averageResidual(const std::vector<Residual>& residuals) {
 
 HoughTransformer::HitCluster& cutOnResidualPulls(
 		HoughTransformer::HitCluster& cluster,
-		const std::vector<Residual>& residuals, double maxPull) {
+		const std::vector<Residual>& residuals, double maxPullx, double maxPully) {
 	auto res=residuals.begin();
 	int nremoved=cluster.size();
-	//no erase necessary because list version of remove_if
-	cluster.remove_if( [&res, &maxPull](const PositionHit&h){
-		bool cut= res->x*res->x/h.error2x > maxPull*maxPull or res->y*res->y/h.error2y > maxPull*maxPull;
+//	//no erase necessary because list version of remove_if
+//	cluster.remove_if( [&res, &maxPull](const PositionHit&h){
+//		bool cut= res->x*res->x/h.error2x > maxPull*maxPull or res->y*res->y/h.error2y > maxPull*maxPull;
+//		++res;
+//		return cut;
+//	} );
+	for(auto& h : cluster) {
+		if( res->x*res->x/h.error2x > maxPullx*maxPullx) h.flag=-1;
+		if( res->y*res->y/h.error2y > maxPully*maxPully) h.flag=-2;
 		++res;
-		return cut;
-	} );
+	}
+
 	nremoved-=cluster.size();
 //	std::cout<<"Removed "<<nremoved<<" hits"<<std::endl;
 	return cluster;

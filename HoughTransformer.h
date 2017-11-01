@@ -72,6 +72,13 @@ struct HoughTransformer {
 			sum*=(1./this->size());
 			return sum;
 		}
+		int getNHitsUnflagged() {
+			int n=0;
+			for(const auto&h : (*this) ) {
+				if(h.flag>0) ++n;
+			}
+			return n;
+		}
 	};
 
 	template<class T >

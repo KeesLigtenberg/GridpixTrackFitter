@@ -9,13 +9,7 @@
 
 using namespace std;
 
-
-//note the template causes multiple canvases, because each one has its own static variable
-template <class T> //std::vector<PositionHit>
-void TrackCombiner::drawEvent(const T& hits,
-		const std::vector<FitResult3D>& fits) {
-	static TCanvas* timepixCanv=new TCanvas(typeid(T).name(),"Display of timepix event", 600,400);
-	timepixCanv->cd();
+vector<FitResult3D> transformFitsToTimepixFrame( const std::vector<FitResult3D>& fits, const Alignment& alignment) {
 	auto& ra=alignment.relativeAlignment;
 	vector<FitResult3D> fitsInTimePixFrame;
 	for(auto& f :fits ) //telescopeTPCLines)
@@ -25,6 +19,17 @@ void TrackCombiner::drawEvent(const T& hits,
 				 .makeRotated(-ra.angle[0], ra.getCOM(), {1,0,0})
 				 .makeRotated(-ra.angle[1], ra.getCOM(), {0,1,0})
 				 .makeMirrorY() ); //
+	return fitsInTimePixFrame;
+}
+
+//note the template causes multiple canvases, because each one has its own static variable
+template <class T> //std::vector<PositionHit>
+void TrackCombiner::drawEvent(const T& hits,
+		const std::vector<FitResult3D>& fits) {
+	static TCanvas* timepixCanv=new TCanvas(typeid(T).name(),"Display of timepix event", 600,400);
+	timepixCanv->cd();
+	auto& ra=alignment.relativeAlignment;
+	vector<FitResult3D> fitsInTimePixFrame=transformFitsToTimepixFrame(fits, alignment);
 	auto hitsInTimepixFrame=hits;
 	for(auto& h: hitsInTimepixFrame) {
 		h.SetPosition(h.getPosition() - ra.shift);
@@ -178,7 +183,7 @@ void putResidualsInEntry(
 
 std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 	for(auto& h : hits) {
-		double Dy=0.089, Dx=0.068;
+		double Dy=0.089, Dx=0.0737;
 		double z0=3.642;
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0);
 		h.error2x=1.56*1.56*.075*.075/12.+Dx*Dx*(h.x-z0); //1.56 is timePix3 time resolution
@@ -252,14 +257,14 @@ void TrackCombiner::processTracks() {
 		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes, tpcEntryNumber); continue; };
 		vector<HoughTransformer::HitCluster> tpcFittedClusters; //todo: replace with actual cluster for removing hits from cluster
 		for( auto& cluster : tpcClusters ) {
-			if(cluster.size()<2) continue;
+			if(cluster.getNHitsUnflagged()<2) continue;
 			auto fit=regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			auto residuals=calculateResiduals(cluster, fit);
 //			cout<<cluster.size();
-			cluster=cutOnResidualPulls(cluster, residuals, 2);
+			cluster=cutOnResidualPulls(cluster, residuals, 3, 2);
 //			cout<<" - "<<cluster.size()<<"\n";
-			if(cluster.size()<2) continue;
+			if(cluster.getNHitsUnflagged()<2) continue;
 			fit=regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			tpcFits.push_back(fit);
@@ -397,7 +402,7 @@ void TrackCombiner::processTracks() {
 
 
 		for(unsigned iClust=0; iClust<tpcFittedClusters.size(); ++iClust) {
-			if(tpcFitIsMatched[iClust])	treeEntry.tpcClusterSize.push_back( tpcFittedClusters[iClust].size());//count cluster size of only fitted clusters
+			if(tpcFitIsMatched[iClust])	treeEntry.tpcClusterSize.push_back( tpcFittedClusters[iClust].getNHitsUnflagged() );//count cluster size of only fitted clusters
 		}
 		treeEntry.ntpcHits=tpcHits.size();
 		treeEntry.ntelescopeHits=0;

@@ -73,15 +73,6 @@ struct FitResult3D {
 #pragma link C++ class FitResult3D+;
 #pragma link C++ class std::vector<FitResult3D>+;
 
-//struct TrackFitResult {
-//	TrackFitResult(const SimpleFitResult& fr) : //TODO: check! this was before y <-> z
-//		phi(atan(1.)*2 - atan(fr.slope1)),
-//		d0(fr.intersept1 * sin(phi)), //had -
-//		tanlambda( (tan(fr.slope2 / fabs(fr.slope2)*acos(sqrt(fr.slope1*fr.slope1 + 1) / sqrt(fr.slope1*fr.slope1 + 1 + fr.slope2*fr.slope2)))) ),
-//		z0(- (fr.slope1*fr.intersept1*fr.slope2) + (fr.slope1*fr.slope1 + 1) + fr.intersept2)
-//	{}
-//	double phi, d0, tanlambda, z0;
-//};
 
 FitResult3D regressionFit3d(const HoughTransformer::HitCluster& cluster, double interceptz=0);
 
