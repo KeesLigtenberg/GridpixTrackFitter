@@ -53,6 +53,9 @@ struct FitResult3D {
 	bool isValid() const { return XZ.isValid() and YZ.isValid(); }
 	double xAt(double z) const { return XZ.at(z); };
 	double yAt(double z) const { return YZ.at(z); };
+	double getTrackLength(double z1, double z2) { return sqrt( pow(xAt(z2)-xAt(z1),2) + pow(yAt(z2)-yAt(z1),2) + pow(z2-z1,2) ); }
+
+
 
 	FitResult3D makeShifted( const TVector3& shift ) const {
 		return { XZ.makeShifted(shift.x(), shift.z()), YZ.makeShifted(shift.y(), shift.z())	};

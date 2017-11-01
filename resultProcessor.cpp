@@ -4,7 +4,11 @@
 #include <TCanvas.h>
 #include "TProfile2D.h"
 
-resultProcessor::resultProcessor(TTree *tree) : fChain(0)
+#include "testBeamSetup.h"
+
+resultProcessor::resultProcessor(TTree *tree) :
+	fChain(0),
+	alignment("alignment.dat")
 {
 // if parameter tree is not specified (or zero), connect the file
 // used to generate this class and read the Tree.
@@ -34,6 +38,9 @@ Int_t resultProcessor::GetEntry(Long64_t entry)
 // Read contents of entry.
    if (!fChain) return 0;
    return fChain->GetEntry(entry);
+
+   //calculate derived quantities
+   timepixFrameFits=transformFitsToTimepixFrame(*timepixFits, alignment.relativeAlignment);
 }
 Long64_t resultProcessor::LoadTree(Long64_t entry)
 {
@@ -168,12 +175,15 @@ void resultProcessor::Loop()
    TH2D diffusionx("diffusionx", "x residuals as a function of drift distance", 50,4,20,40,-2,2);
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance", 50,4,20,40,-2,2);
 
+
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       nb = fChain->GetEntry(jentry);   nbytes += nb;
        if (Cut(ientry) < 0) continue;
+
+       std::cout<<"trackLength is "<<timepixFrameFits.front().getTrackLength( timePixChip.zmin(), timePixChip.zmax() )<<"\n";
 
       for(auto& h : timepixHits->front() ) {
     	  if(h.ToT*0.025<0.15 or h.flag<0) continue;

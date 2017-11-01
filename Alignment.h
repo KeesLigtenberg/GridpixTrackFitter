@@ -81,6 +81,7 @@ struct ToTCorrector {
 };
 
 struct Alignment {
+	//class for keeping all alignment
 	Alignment() {};
 	Alignment(std::string filename) {
 		std::ifstream fin(filename);
@@ -104,7 +105,6 @@ struct Alignment {
 		mimosa.save(fout);
 	}
 
-	//class for keeping all alignment
 	TimeWalkCorrector timeWalkCorrection;
 	RelativeAligner relativeAlignment;
 	MimosaAligner mimosa;
@@ -320,6 +320,18 @@ std::vector<PositionHit>& ToTCorrector::correct(
 		h.ToT/=factor;
 	}
 	return spaceHit;
+}
+
+std::vector<FitResult3D> transformFitsToTimepixFrame( const std::vector<FitResult3D>& fits, const RelativeAligner& ra) {
+	std::vector<FitResult3D> fitsInTimePixFrame;
+	for(auto& f :fits ) //telescopeTPCLines)
+		fitsInTimePixFrame.push_back(
+				f.makeShifted(-ra.shift)
+				 .makeRotated(-ra.angle[2], ra.getCOM(), {0,0,1})
+				 .makeRotated(-ra.angle[0], ra.getCOM(), {1,0,0})
+				 .makeRotated(-ra.angle[1], ra.getCOM(), {0,1,0})
+				 .makeMirrorY() ); //
+	return fitsInTimePixFrame;
 }
 
 #endif /* ALIGNMENT_H_ */

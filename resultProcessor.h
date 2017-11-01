@@ -16,6 +16,7 @@
 
 #include "HitEntry.h"
 #include "linearRegressionFit.cpp"
+#include "Alignment.h"
 
 class resultProcessor {
 public :
@@ -39,6 +40,10 @@ public :
    Int_t           nresiduals;
    Int_t           nfitted;
 
+   //derived quantities
+   std::vector<FitResult3D> timepixFrameFits;
+
+
    // List of branches
    TBranch        *b_telescopeFits;
    TBranch        *b_timepixFits;
@@ -61,6 +66,8 @@ public :
    virtual void     Loop();
    virtual Bool_t   Notify();
    virtual void     Show(Long64_t entry = -1);
+
+   Alignment alignment;
 };
 
 #endif

@@ -9,19 +9,6 @@
 
 using namespace std;
 
-vector<FitResult3D> transformFitsToTimepixFrame( const std::vector<FitResult3D>& fits, const Alignment& alignment) {
-	auto& ra=alignment.relativeAlignment;
-	vector<FitResult3D> fitsInTimePixFrame;
-	for(auto& f :fits ) //telescopeTPCLines)
-		fitsInTimePixFrame.push_back(
-				f.makeShifted(-ra.shift)
-				 .makeRotated(-ra.angle[2], ra.getCOM(), {0,0,1})
-				 .makeRotated(-ra.angle[0], ra.getCOM(), {1,0,0})
-				 .makeRotated(-ra.angle[1], ra.getCOM(), {0,1,0})
-				 .makeMirrorY() ); //
-	return fitsInTimePixFrame;
-}
-
 //note the template causes multiple canvases, because each one has its own static variable
 template <class T> //std::vector<PositionHit>
 void TrackCombiner::drawEvent(const T& hits,
@@ -29,7 +16,7 @@ void TrackCombiner::drawEvent(const T& hits,
 	static TCanvas* timepixCanv=new TCanvas(typeid(T).name(),"Display of timepix event", 600,400);
 	timepixCanv->cd();
 	auto& ra=alignment.relativeAlignment;
-	vector<FitResult3D> fitsInTimePixFrame=transformFitsToTimepixFrame(fits, alignment);
+	vector<FitResult3D> fitsInTimePixFrame=transformFitsToTimepixFrame(fits, ra);
 	auto hitsInTimepixFrame=hits;
 	for(auto& h: hitsInTimepixFrame) {
 		h.SetPosition(h.getPosition() - ra.shift);
@@ -186,7 +173,8 @@ std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 		double Dy=0.089, Dx=0.0737;
 		double z0=3.642;
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0);
-		h.error2x=1.56*1.56*.075*.075/12.+Dx*Dx*(h.x-z0); //1.56 is timePix3 time resolution
+		double ds=timePixChip.driftSpeed;
+		h.error2x=1.56*1.56*ds*ds/12.+Dx*Dx*(h.x-z0); //1.56 is timePix3 time resolution
 	}
 	return hits;
 }
