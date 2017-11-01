@@ -290,7 +290,7 @@ void TrackCombiner::processTracks() {
 		//match fits and clusters + calculate residuals
 		int nmatched=0;
 		bool atLeastOneThroughDetector=false;
-		vector<FitResult3D> telescopeTPCLines, combinedFits;
+		vector<FitResult3D> telescopeTPCLines, combinedFits, tpcPlusOneFits;
 		std::vector<bool> tpcFitIsMatched(tpcFits.size()), telescopeFitIsMatched(telescopeFits.size());
 		for(unsigned iFit=0; iFit<tpcFits.size();++iFit) {
 			const auto& tpcFit=tpcFits[iFit];
@@ -337,8 +337,16 @@ void TrackCombiner::processTracks() {
 						continue;
 					}
 
+					//get extra point from telescope
 					PositionHit lastPlaneCrossing( telescopeFit.xAt(0), telescopeFit.yAt(0), 0 );
 					lastPlaneCrossing.error2x=lastPlaneCrossing.error2y=1E-4;//=0.01mm
+
+					//get tpcCluster plus one!
+					auto tpcPlusOneCluster=tpcFittedClusters.at(iFit);
+					tpcPlusOneCluster.add(lastPlaneCrossing);
+					auto tpcPlusOneFit=regressionFit3d(tpcPlusOneCluster);
+					tpcPlusOneFits.push_back(tpcPlusOneFit);
+
 					splitTpcCluster.first.add( lastPlaneCrossing );
 					auto combinedFit=regressionFit3d(splitTpcCluster.first);
 					combinedFits.push_back(combinedFit);
