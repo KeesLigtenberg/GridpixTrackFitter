@@ -276,6 +276,14 @@ void TrackCombiner::processTracks() {
 			if( telescopeFitter.processDrawSignals()  ) break;
 		}
 
+		//set trackLength entry
+		//temporary: should be done using function!
+		{
+			auto timepixFrameFits=transformFitsToTimepixFrame(tpcFits, alignment.relativeAlignment);
+			auto g=timepixFrameFits.begin();
+			for(auto& f : tpcFits) f.trackLength=g++->getTrackLength(tpcDetector.zmin(), tpcDetector.zmax());
+		}
+
 		//make new entry
 		BufferedTreeFiller::TreeEntry treeEntry;
 

@@ -37,10 +37,12 @@ Int_t resultProcessor::GetEntry(Long64_t entry)
 {
 // Read contents of entry.
    if (!fChain) return 0;
-   return fChain->GetEntry(entry);
+   auto nb=fChain->GetEntry(entry);
 
    //calculate derived quantities
    timepixFrameFits=transformFitsToTimepixFrame(*timepixFits, alignment.relativeAlignment);
+
+   return nb;
 }
 Long64_t resultProcessor::LoadTree(Long64_t entry)
 {
@@ -159,6 +161,18 @@ void getFrequencyHistogram(TProfile2D* original, double systematicError, double 
 		}
 	}
 }
+
+std::vector<int> rebinHits(const std::vector<int>& hits, int startbin, int endbin, int nBinsPerNewBin) {
+	if(!(endbin-startbin)%nBinsPerNewBin) {
+		std::cerr<<"bins should exactly match range!\n"; throw 1;
+	}
+	std::vector<int> newBins((endbin-startbin)/nBinsPerNewBin);
+	for(int i = startbin; i<endbin; i++ ) {
+		newBins[(i-startbin)/nBinsPerNewBin]+=hits[i];
+	}
+	return newBins;
+}
+
 void resultProcessor::Loop()
 {
    if (fChain == 0) return;
@@ -175,15 +189,19 @@ void resultProcessor::Loop()
    TH2D diffusionx("diffusionx", "x residuals as a function of drift distance", 50,4,20,40,-2,2);
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance", 50,4,20,40,-2,2);
 
+   TH1D trackLength("trackLength", "length of track in tpc", 40,13,16);
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
+	  std::cout<<"entry "<<jentry<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
-      nb = fChain->GetEntry(jentry);   nbytes += nb;
+      auto nb = GetEntry(jentry);  nbytes += nb;
        if (Cut(ientry) < 0) continue;
 
-       std::cout<<"trackLength is "<<timepixFrameFits.front().getTrackLength( timePixChip.zmin(), timePixChip.zmax() )<<"\n";
+       trackLength.Fill(timepixFrameFits.at(0).getTrackLength( timePixChip.zmin(), timePixChip.zmax() ));
+
+ 	  std::vector<int> hitsAlongTrack(256);
 
       for(auto& h : timepixHits->front() ) {
     	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
@@ -197,10 +215,27 @@ void resultProcessor::Loop()
     	  diffusionx.Fill(h.x-h.rx, h.rx);
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
+
+    	  //calculate xy
+    	  double xInTimepixFrame=0.055*h.col;
+    	  double yInTimepixFrame=0.055*h.row;
+    	  //set hits along tracks, how should track angle enter here?
+    	 ++hitsAlongTrack[h.col];
+
+      }
+
+      //sum hits
+      {
+		  auto rebinnedHitsAlongTrack=rebinHits(hitsAlongTrack, 8, 248, 10);
+		  std::sort(rebinnedHitsAlongTrack.begin(), rebinnedHitsAlongTrack.end());
+		  int sumFirstN=rebinnedHitsAlongTrack.size()/10.*7;
+		  double sum=std::accumulate(rebinnedHitsAlongTrack.begin(), rebinnedHitsAlongTrack.begin() + sumFirstN , 0);
+		  double mean=sum/sumFirstN;
       }
 
    }
    gStyle->SetPalette(1);
+
 
    std::vector<double> errorVector={0.005, .020, 0.005, .020};
    auto error=errorVector.begin();
