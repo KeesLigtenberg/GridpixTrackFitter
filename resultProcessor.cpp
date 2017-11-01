@@ -103,12 +103,55 @@ Int_t resultProcessor::Cut(Long64_t entry)
 // This function may be called from Loop.
 // returns  1 if entry is accepted.
 // returns -1 otherwise.
-   if(timepixClusterSize->front()/double(ntimepixHits)<0.80) return -1;
+   if(timepixClusterSize->front()/double(ntimepixHits)<0.60) return -1;
    if(timepixClusterSize->front()<30 or timepixClusterSize->front()>300) return -1;
 
    return 1;
 }
 
+bool isInsideArea(int x, int y) {
+	if(x<=16 or x>=240) {return false;}
+	if(y< 80-50./225*x) return false;
+	return true;
+}
+
+TProfile2D* removeBinsWithFewerEntries(TProfile2D* h, int minEntries){
+	for(int x=1; x<=h->GetNbinsX(); x++) {
+		for(int y=1; y<=h->GetNbinsY(); y++) {
+			int bin=h->GetBin(x,y);
+			if( h->GetBinEntries(bin) < minEntries or !isInsideArea( h->GetXaxis()->GetBinCenter(x), h->GetYaxis()->GetBinCenter(y) )) {
+				h->SetBinEntries(bin, 0);
+			}
+		}
+	}
+	return h;
+}
+
+
+//do frequency on an unweighted histogram, i.e. all entreis should have same weight
+void getFrequencyHistogram(TProfile2D* original, double systematicError, double min=-0.1, double max=0.1, int nBins=40, double entryWeight=1.0) {
+	TH1D* frequencyHist=new TH1D(
+		(original->GetName()+std::string("freq")).c_str(),
+		(original->GetTitle()+std::string("frequency; frequency;")+original->GetXaxis()->GetTitle() ).c_str(),
+		nBins, min, max);
+	TH1D* frequencyPull=new TH1D(
+		(original->GetName()+std::string("freqPull")).c_str(),
+		(original->GetTitle()+std::string("frequencyPull; frequency;")+original->GetXaxis()->GetTitle() ).c_str(),
+		100, -5, 5);
+	for(int i=1;i<=original->GetNbinsX();i++) {
+		for(int j=1; j<=original->GetNbinsY();j++) {
+			int bin=original->GetBin(i,j);
+			if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
+			if( original->GetBinEntries(bin) > 0 ) {
+				double binContent= original->GetBinContent(i,j); //possible rounding error here
+				double binError=original->GetBinError(i,j);
+				double error=sqrt(binError*binError+systematicError*systematicError);
+				frequencyHist->Fill(binContent);
+				frequencyPull->Fill(binContent/error);
+			}
+		}
+	}
+}
 void resultProcessor::Loop()
 {
    if (fChain == 0) return;
@@ -117,9 +160,11 @@ void resultProcessor::Loop()
    TFile output("histograms.root", "RECREATE");
 
    TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
-
-   TProfile2D deformationsy("deformationsy", "profile of y residuals", 64, 0, 256, 64, 0, 256, -1, 1);
-   TProfile2D deformationsx("deformationsx", "profile of x residuals", 64, 0, 256, 64, 0, 256, -1, 1);
+   const int nbins=64;
+   TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TProfile2D deformationsxExp("deformationsxExp", "profile of x residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TProfile2D deformationsy("deformationsy", "profile of y residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TProfile2D deformationsx("deformationsx", "profile of x residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TH2D diffusionx("diffusionx", "x residuals as a function of drift distance", 50,4,20,40,-2,2);
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance", 50,4,20,40,-2,2);
 
@@ -131,9 +176,12 @@ void resultProcessor::Loop()
        if (Cut(ientry) < 0) continue;
 
       for(auto& h : timepixHits->front() ) {
-    	  if(h.ToT*0.025<0.2) continue;
-    	  deformationsx.Fill(h.row+h.ry/.055, h.col+h.rz/.055, h.rx );
-    	  deformationsy.Fill(h.row+h.ry/.055, h.col+h.rz/.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
+    	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
+    	  double hryp=h.ry/cos(timepixFits->front().YZ.slope);
+    	  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
+    	  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
+    	  deformationsx.Fill( h.col, h.row+hryp/0.055, h.rx );
+    	  deformationsy.Fill( h.col, h.row+hryp/0.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
 
     	  diffusiony.Fill(h.x-h.rx, h.ry);
     	  diffusionx.Fill(h.x-h.rx, h.rx);
@@ -144,11 +192,14 @@ void resultProcessor::Loop()
    }
    gStyle->SetPalette(1);
 
-   for(auto d : {&deformationsy, &deformationsx} ) {
+   std::vector<double> errorVector={0.005, .020, 0.005, .020};
+   auto error=errorVector.begin();
+   for(auto d : {&deformationsy, &deformationsx, &deformationsyExp, &deformationsxExp} ) {
+	   removeBinsWithFewerEntries(d, 100);
+	   getFrequencyHistogram(d, *error++);
 	   d->SetMinimum(-0.1);
 	   d->SetMaximum(0.1);
    }
-   deformationsy.DrawClone("colz");
 
    output.Write();
 }
