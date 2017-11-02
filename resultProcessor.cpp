@@ -150,7 +150,7 @@ void getFrequencyHistogram(TProfile2D* original, double systematicError, double 
 	for(int i=1;i<=original->GetNbinsX();i++) {
 		for(int j=1; j<=original->GetNbinsY();j++) {
 			int bin=original->GetBin(i,j);
-			if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
+//			if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
 			if( original->GetBinEntries(bin) > 0 ) {
 				double binContent= original->GetBinContent(i,j); //possible rounding error here
 				double binError=original->GetBinError(i,j);
@@ -173,6 +173,16 @@ std::vector<int> rebinHits(const std::vector<int>& hits, int startbin, int endbi
 	return newBins;
 }
 
+double truncatedMean(std::vector<int>& binned, double fraction=0.7) {
+	  std::sort(binned.begin(), binned.end());
+	  int sumFirstN=binned.size()*fraction;
+	  double sum=std::accumulate(binned.begin(), binned.begin() + sumFirstN , 0);
+	  double mean=sum/sumFirstN;
+	  return mean;
+}
+
+#pragma link C++ class std::vector<int>+;
+
 void resultProcessor::Loop()
 {
    if (fChain == 0) return;
@@ -190,10 +200,16 @@ void resultProcessor::Loop()
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance", 50,4,20,40,-2,2);
 
    TH1D trackLength("trackLength", "length of track in tpc", 40,13,16);
+   TH1D truncatedMeanHits("truncatedMeanHits", "mean per n bins", 40, 0, 10);
+   TH1D meanHits("MeanHits", "mean per n bins", 40, 0, 20);
+
+   std::vector<int> hitsAlongTrack(256);
+   TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
+   binnedHitsTree.Branch("hits", &hitsAlongTrack );
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
-	  std::cout<<"entry "<<jentry<<"\n";
+//	  std::cout<<"entry "<<jentry<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       auto nb = GetEntry(jentry);  nbytes += nb;
@@ -201,7 +217,7 @@ void resultProcessor::Loop()
 
        trackLength.Fill(timepixFrameFits.at(0).getTrackLength( timePixChip.zmin(), timePixChip.zmax() ));
 
- 	  std::vector<int> hitsAlongTrack(256);
+ 	  std::fill(hitsAlongTrack.begin(), hitsAlongTrack.end(), 0);
 
       for(auto& h : timepixHits->front() ) {
     	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
@@ -225,12 +241,22 @@ void resultProcessor::Loop()
       }
 
       //sum hits
+      binnedHitsTree.Fill();
       {
-		  auto rebinnedHitsAlongTrack=rebinHits(hitsAlongTrack, 8, 248, 10);
-		  std::sort(rebinnedHitsAlongTrack.begin(), rebinnedHitsAlongTrack.end());
-		  int sumFirstN=rebinnedHitsAlongTrack.size()/10.*7;
-		  double sum=std::accumulate(rebinnedHitsAlongTrack.begin(), rebinnedHitsAlongTrack.begin() + sumFirstN , 0);
-		  double mean=sum/sumFirstN;
+    	  //view bins
+//    	  TH1D hitsAlongTrackHist("hitsAlongTrackHist", "hits along track", hitsAlongTrack.size(), 0, hitsAlongTrack.size() );
+//    	  std::vector<double> asDouble(hitsAlongTrack.begin(), hitsAlongTrack.end());
+//    	  hitsAlongTrackHist.SetContent(asDouble.data());
+//    	  hitsAlongTrackHist.Draw();
+//    	  gPad->Update();
+
+		  auto rebinnedHitsAlongTrack=rebinHits(hitsAlongTrack, 18, 238, 20);
+    	  double mean=truncatedMean(rebinnedHitsAlongTrack,0.7);
+		  truncatedMeanHits.Fill(mean);
+		  meanHits.Fill( truncatedMean(rebinnedHitsAlongTrack,1.) );
+
+//		  std::cout<<"total mean "<<truncatedMean(rebinnedHitsAlongTrack,1.)<<" truncated "<<mean<<"\n";
+//    	  if(std::cin.get()=='q') break;;
       }
 
    }
