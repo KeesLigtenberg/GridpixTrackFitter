@@ -354,7 +354,7 @@ void TrackCombiner::processTracks() {
 					if(doSplitForResiduals) {
 						putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);
 					} else {
-						putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcFit, alignment);
+						putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcPlusOneFit, alignment);
 					}
 
 					++nmatched;
@@ -412,7 +412,7 @@ void TrackCombiner::processTracks() {
 		treeEntry.ntelescopeHits=0;
 		for(auto& v : telescopeHits ) treeEntry.ntelescopeHits+=v.size();
 		treeEntry.telescopeFits=telescopeFits;
-		treeEntry.tpcFits=tpcFits;
+		treeEntry.tpcFits=tpcPlusOneFits;
 		treeBuffer.placeInBuffer(tpcEntryNumber, treeEntry);
 		int oldestRelevantTpcEntryNumber=tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin);
 //		cout<<"oldestRelevantTpcEntryNumber: "<<oldestRelevantTpcEntryNumber<<"\n";

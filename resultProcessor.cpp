@@ -1,4 +1,7 @@
 #include "resultProcessor.h"
+
+#include <deque>
+
 #include <TH2.h>
 #include <TStyle.h>
 #include <TCanvas.h>
@@ -112,8 +115,9 @@ Int_t resultProcessor::Cut(Long64_t entry)
 // This function may be called from Loop.
 // returns  1 if entry is accepted.
 // returns -1 otherwise.
-   if(timepixClusterSize->front()/double(ntimepixHits)<0.60) return -1;
-   if(timepixClusterSize->front()<30 or timepixClusterSize->front()>300) return -1;
+   if(timepixClusterSize->front()/double(ntimepixHits)<0.75) return -1;
+   if(timepixClusterSize->front()<30) return -1;
+//		   or timepixClusterSize->front()>300
 
    return 1;
 }
@@ -128,7 +132,9 @@ TProfile2D* removeBinsWithFewerEntries(TProfile2D* h, int minEntries){
 	for(int x=1; x<=h->GetNbinsX(); x++) {
 		for(int y=1; y<=h->GetNbinsY(); y++) {
 			int bin=h->GetBin(x,y);
-			if( h->GetBinEntries(bin) < minEntries or !isInsideArea( h->GetXaxis()->GetBinCenter(x), h->GetYaxis()->GetBinCenter(y) )) {
+			if( h->GetBinEntries(bin) < minEntries
+//					or !isInsideArea( h->GetXaxis()->GetBinCenter(x), h->GetYaxis()->GetBinCenter(y) )
+				) {
 				h->SetBinEntries(bin, 0);
 			}
 		}
@@ -150,7 +156,7 @@ void getFrequencyHistogram(TProfile2D* original, double systematicError, double 
 	for(int i=1;i<=original->GetNbinsX();i++) {
 		for(int j=1; j<=original->GetNbinsY();j++) {
 			int bin=original->GetBin(i,j);
-//			if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
+			if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
 			if( original->GetBinEntries(bin) > 0 ) {
 				double binContent= original->GetBinContent(i,j); //possible rounding error here
 				double binError=original->GetBinError(i,j);
@@ -180,6 +186,13 @@ double truncatedMean(std::vector<int>& binned, double fraction=0.7) {
 	  double mean=sum/sumFirstN;
 	  return mean;
 }
+template <class RAcontainer=std::vector<int> >
+double truncatedSum(RAcontainer& binned, double fraction=0.7) {
+	  std::sort(binned.begin(), binned.end());
+	  int sumFirstN=binned.size()*fraction;
+	  double sum=std::accumulate(binned.begin(), binned.begin() + sumFirstN , 0);
+	  return sum;
+}
 
 #pragma link C++ class std::vector<int>+;
 
@@ -200,10 +213,13 @@ void resultProcessor::Loop()
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance", 50,4,20,40,-2,2);
 
    TH1D trackLength("trackLength", "length of track in tpc", 40,13,16);
-   TH1D truncatedMeanHits("truncatedMeanHits", "mean per n bins", 40, 0, 10);
-   TH1D meanHits("MeanHits", "mean per n bins", 40, 0, 20);
+   TH1D truncatedSumHits("truncatedSumHits", "mean per n bins", 100, 0, 100);
+   TH1D sumHits("sumHits", "mean per n bins", 200, 0, 200);
+   TH1D chargePerBin("chargePerBin", "chargePerBin", 400,0,400);
+   TH1D aggravatedMeanHits("aggravatedHits", "mean per n bins", 400, 0, 400);
 
-   std::vector<int> hitsAlongTrack(256);
+   std::vector<int> hitsAlongTrack(512);
+   std::deque<int> aggravatedHits;
    TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
    binnedHitsTree.Branch("hits", &hitsAlongTrack );
 
@@ -235,9 +251,19 @@ void resultProcessor::Loop()
     	  //calculate xy
     	  double xInTimepixFrame=0.055*h.col;
     	  double yInTimepixFrame=0.055*h.row;
-    	  //set hits along tracks, how should track angle enter here?
-    	 ++hitsAlongTrack[h.col];
 
+    	  {
+    		  //check with algebra
+//        	  auto pos=h.createPositionHit();
+//        	  pos=transformHitToTimepixFrame(pos, alignment.relativeAlignment);
+//    		  auto& f=timepixFrameFits.at(0);
+//    		  double z0=timePixChip.zmin(), y0=f.yAt(z0);
+//    		  double l=( (pos.z-z0)+(pos.y-y0)*f.YZ.slope )/sqrt(1+pow(f.YZ.slope,2));
+//    		  double bin=l/(sqrt(1+pow(f.YZ.slope,2))*.055)-0.5;
+//    		  std::cout<<bin<<" - "<<h.col-h.rz/0.055<<"    ("<<bin-(h.col-h.rz/0.055)<<")\n";
+
+    		  ++hitsAlongTrack[2*(h.col-h.rz/.055)];
+    	  }
       }
 
       //sum hits
@@ -250,10 +276,21 @@ void resultProcessor::Loop()
 //    	  hitsAlongTrackHist.Draw();
 //    	  gPad->Update();
 
-		  auto rebinnedHitsAlongTrack=rebinHits(hitsAlongTrack, 18, 238, 20);
-    	  double mean=truncatedMean(rebinnedHitsAlongTrack,0.7);
-		  truncatedMeanHits.Fill(mean);
-		  meanHits.Fill( truncatedMean(rebinnedHitsAlongTrack,1.) );
+		  auto rebinnedHits=rebinHits(hitsAlongTrack, 32, 472, 40);
+		  for(const auto& i : rebinnedHits) {
+			  chargePerBin.Fill(i);
+		  }
+//		  auto rebinnedHits=rebinHits(hitsAlongTrack, 16, 236, 10);
+    	  double mean=truncatedSum(rebinnedHits,0.7);
+		  truncatedSumHits.Fill(mean);
+		  sumHits.Fill( truncatedSum(rebinnedHits,1.) );
+
+		  aggravatedHits.insert(aggravatedHits.end(), rebinnedHits.begin(), rebinnedHits.end() );
+		  if(aggravatedHits.size() >= 110 ) { //10 events with 11 bins
+//		  if(aggravatedHits.size() >= 220 ) { //10 events with 22 bins
+			  aggravatedMeanHits.Fill( truncatedSum(aggravatedHits, 0.7) );
+			  aggravatedHits.clear();
+		  }
 
 //		  std::cout<<"total mean "<<truncatedMean(rebinnedHitsAlongTrack,1.)<<" truncated "<<mean<<"\n";
 //    	  if(std::cin.get()=='q') break;;

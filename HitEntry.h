@@ -29,6 +29,10 @@ struct HitEntry {
 	int ToT; //ToT in [0.025 ns]
 	int row, col; //row col of hit
 	int flag;
+
+	PositionHit createPositionHit() {
+		return PositionHit(x,y,z, 0,row,col,ToT,1,1);
+	}
 };
 #pragma link C++ class std::vector<HitEntry>+;
 #pragma link C++ class std::vector< std::vector<HitEntry> >+;

@@ -334,4 +334,21 @@ std::vector<FitResult3D> transformFitsToTimepixFrame( const std::vector<FitResul
 	return fitsInTimePixFrame;
 }
 
+PositionHit& transformHitToTimepixFrame( PositionHit& h, const RelativeAligner& ra) {
+	h.SetPosition(h.getPosition() - ra.shift);
+	h.RotatePosition(-ra.angle[2], ra.getCOM(), {0,0,1});
+	h.RotatePosition(-ra.angle[0], ra.getCOM(), {1,0,0});
+	h.RotatePosition(-ra.angle[1], ra.getCOM(), {0,1,0});
+	h.y=-h.y;
+	return h;
+}
+
+std::vector<PositionHit> transformHitsToTimepixFrame( const std::vector<PositionHit>& hits, const RelativeAligner& ra) {
+	auto hitsInTimepixFrame=hits;
+	for(auto& h: hitsInTimepixFrame) {
+		h=transformHitToTimepixFrame(h, ra);
+	}
+	return hitsInTimepixFrame;
+}
+
 #endif /* ALIGNMENT_H_ */
