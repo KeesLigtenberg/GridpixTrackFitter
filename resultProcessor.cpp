@@ -203,6 +203,7 @@ void resultProcessor::Loop()
 
    TFile output("histograms.root", "RECREATE");
 
+   TH2D hitmap("hitmap", "map of hits in tracks", 256,0,256,256,0,256 );
    TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
    const int nbins=64;
    TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
@@ -237,6 +238,9 @@ void resultProcessor::Loop()
 
       for(auto& h : timepixHits->front() ) {
     	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
+
+    	  hitmap.Fill( h.col, h.row );
+
     	  double hryp=h.ry/cos(timepixFits->front().YZ.slope);
     	  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
     	  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
