@@ -37,7 +37,7 @@ public:
 	void save(std::ostream&) const;
 	void load(std::istream&);
 private:
-	double minToT, shiftToT, shiftx, coefficient;
+	double minToT, coefficient, shiftToT, shiftx;
 };
 
 
@@ -310,7 +310,13 @@ void ToTCorrector::load(std::istream& in) {
 
 void ToTCorrector::load(std::string filename) {
 	std::ifstream in(filename.c_str());
-	load(in);
+	if(in.good()){
+		load(in);
+	} else {
+		std::cout<<"Did not find ToTCorrection: not using any factor!\n";
+		firstCol=0; lastCol=ncols;
+		std::fill(correction.begin(), correction.end(), 1.);
+	}
 }
 
 std::vector<PositionHit>& ToTCorrector::correct(

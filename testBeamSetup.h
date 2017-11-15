@@ -16,7 +16,7 @@ struct TimePixDetectorConfiguration : DetectorConfiguration {
 		0.055, 256, 256 //pixelsize, xpixels, ypixels
 	} {};
 	virtual double xmin() const {return 0.*driftSpeed; }
-	virtual double xmax() const {return 225*driftSpeed; }
+	virtual double xmax() const {return 300*driftSpeed; }
 	virtual double zmin() const {return 0; }
 	virtual double zmax() const {return pixelColumns*pixelsize; };
 } timePixChip;

@@ -179,15 +179,36 @@ std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 	return hits;
 }
 
+int getMaxNumberOfEmptyRows(const std::vector<PositionHit>& hits) {
+	std::vector<int> rows(256);
+	for(const auto& h : hits) {
+		++rows.at(h.column);
+	}
+	int maxEmpty=0, current=0;
+	for(const int& i : rows ) {
+		if(!i) ++current;
+		else {
+			maxEmpty=max(maxEmpty, current);
+			current=0;
+		}
+	}
+	maxEmpty=max(maxEmpty, current);
+	return maxEmpty;
+}
+
 void TrackCombiner::processTracks() {
 	const TVector3& timepixShift=alignment.relativeAlignment.shift;
 	const TVector3& rotationCOM=alignment.relativeAlignment.getCOM();
 	ToTCorrector ToTCorrection; ToTCorrection.load("ToTCorrection.dat");
 
+	//DEBUG
+//	timepixEntryFirstMatch=0;
+//	previousTriggerNumberBegin=previousTriggerNumberEnd=0;
+
 	nTelescopeTriggers=0;
-	telescopeFitter.getEntry(0);
+	telescopeFitter.getEntry(previousTriggerNumberBegin);
 	for(int telescopeEntryNumber=0,tpcEntryNumber=0;
-			telescopeEntryNumber<100000
+			telescopeEntryNumber<200000
 			;) {
 		triggerStatusHistogram.reset();
 		// Get Entry and match trigger Numbers
@@ -230,7 +251,7 @@ void TrackCombiner::processTracks() {
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits); //just a shift!
-		tpcHits=ToTCorrection.correct(tpcHits);
+		if(correctToTByCol) tpcHits=ToTCorrection.correct(tpcHits);
 		tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
 		tpcHits=setTPCErrors(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
@@ -266,7 +287,7 @@ void TrackCombiner::processTracks() {
 //		cout<<"timepix passed!"<<endl;
 
 		//display event
-		if( displayEvent ) { // and tpcHits.size()>300 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
+		if( displayEvent and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
 			drawEvent(tpcHits, telescopeFits);
 //			drawEvent(tpcFittedClusters.front(), tpcFits);
 //			{	HoughTransformer::drawCluster(tpcHits, combinedSetupForDrawing);
@@ -307,6 +328,8 @@ void TrackCombiner::processTracks() {
 
 					if(telescopeFitIsMatched[jFit]) { std::cerr<<"telescope fit is matched to 2 timepix clusters!"<<std::endl; }
 
+					if(tpcFittedClusters.at(iFit).getNHitsUnflagged()<2) continue;
+
 					TVector3 tpcPoint=tpcFittedClusters.at(iFit).getAveragePosition();
 
 					//draw line from telescope at z=0 to tpc centre
@@ -332,7 +355,7 @@ void TrackCombiner::processTracks() {
 //					cout<<splittedTpcCluster.first.size()<<" - "<<splittedTpcCluster.second.size()<<"\n";
 					treeEntry.nfitted=splitTpcCluster.first.size();
 					treeEntry.nresiduals=splitTpcCluster.second.size();
-					if(splitTpcCluster.first.size()<1 or splitTpcCluster.second.size()<1) {
+					if(splitTpcCluster.first.getNHitsUnflagged()<2 or splitTpcCluster.second.getNHitsUnflagged()<2) {
 						cout<<"split cluster has no hits!\n";
 						continue;
 					}
@@ -390,7 +413,7 @@ void TrackCombiner::processTracks() {
 			if( treeBuffer.isInBuffer(tpcEntryNumber)){
 				treeBuffer.removeFromBuffer(tpcEntryNumber); //and remove other entry from buffer if so
 			} else {
-				cout<<"Entry that should be removed from buffer, was already removed.\n"
+				cout<<"Entry "<<tpcEntryNumber<<" that should be removed from buffer, was already removed (at telescope entry "<<telescopeEntryNumber<<")\n"
 				"(The entry could have matched to 3 clusters, but this message can also indicate errors)\n";
 			}
 			auto mes="Tpc entry already has a matching cluster"; replaceStatus(21, mes, tpcEntryNumber);
@@ -443,17 +466,22 @@ TrackCombiner::MatchResult TrackCombiner::getAndMatchEntries(
 	//if telescope triggerNumberBegin decreased, and tpc did not already pass this boundary
 	//then we must get entries until the tpc triggernumber also passes the 32768 boundary ( is larger or equal to new trigger number)
 	if(telescopeFitter.triggerNumberBegin<previousTriggerNumberBegin
-			and not (tpcFitter.triggerNumber+triggerOffset+modulusOffset<100) )
+			and not (tpcFitter.triggerNumber+triggerOffset-modulusOffset<500) ) {
 		do {
 			if( !tpcFitter.getEntry(tpcStartEntry++) ) return MatchResult::end;
-		} while ( (tpcFitter.triggerNumber+triggerOffset) % 32768 > previousTriggerNumberBegin );
+		} while ( tpcFitter.triggerNumber+triggerOffset - modulusOffset - 32768 < telescopeFitter.triggerNumberBegin );
+		modulusOffset=32768*int((tpcFitter.triggerNumber+triggerOffset)/32768);
+		//stop timepix from going back over this boundary
+		timepixEntryFirstMatch=tpcStartEntry;
+		hadFirstMatch=true;
+	}
 
 	//get next entry until tpc trigger number is larger than or equal to begin
 	//or until the tpc trigger number decreases;
 	do {
 		if( !tpcFitter.getEntry(tpcStartEntry++) ) return MatchResult::end;
 	} while( (tpcFitter.triggerNumber+triggerOffset-modulusOffset) < telescopeFitter.triggerNumberBegin
-			and telescopeFitter.triggerNumberBegin - (tpcFitter.triggerNumber+triggerOffset-modulusOffset)<100 );
+			and telescopeFitter.triggerNumberBegin - (tpcFitter.triggerNumber+triggerOffset-modulusOffset)<500 );
 
 	//if also larger than end: reached the end of this telescope frame, continue with next telescope frame;
 	if( (tpcFitter.triggerNumber+triggerOffset-modulusOffset) > telescopeFitter.triggerNumberEnd) {

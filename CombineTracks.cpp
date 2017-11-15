@@ -15,8 +15,8 @@ using namespace std;
 //returns correlation factor
 void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent=false) {
 
-	bool doAlignment=false;
-	if(!displayEvent and doAlignment)
+	bool doAlignment=true;
+	if(!displayEvent and doAlignment) {
 		for(int i=0; i<3; ++i) {
 			TrackCombiner combiner(mimosaInput, timepixInput);
 			combiner.loadAlignment("alignment.dat");
@@ -25,15 +25,15 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 			combiner.processTracks();
 			combiner.saveAlignment("alignment.dat");
 		}
-
-	TrackCombiner combiner(mimosaInput, timepixInput);
-	combiner.loadAlignment("alignment.dat");
-	combiner.openFile(displayEvent ? "tmp.root" : "fitResults.root");
-//	combiner.openFile(displayEvent ? "tmp.root" : "fitResultsSplit.root");
-//	combiner.doSplitForResiduals=!displayEvent;
-	combiner.setDisplayEvent(displayEvent);
-	combiner.processTracks();
-
+	} else {
+		TrackCombiner combiner(mimosaInput, timepixInput);
+		combiner.loadAlignment("alignment.dat");
+		combiner.openFile(displayEvent ? "tmp.root" : "fitResults.root");
+	//	combiner.openFile(displayEvent ? "tmp.root" : "fitResultsSplit.root");
+	//	combiner.doSplitForResiduals=!displayEvent;
+		combiner.setDisplayEvent(displayEvent);
+		combiner.processTracks();
+	}
 }
 
 
