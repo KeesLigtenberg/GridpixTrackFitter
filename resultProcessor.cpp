@@ -194,6 +194,53 @@ double truncatedSum(RAcontainer& binned, double fraction=0.7) {
 	  return sum;
 }
 
+bool isZero(double x,double threshold=1E-30) { return fabs(x)<threshold; }
+struct crosstalkCalculator {
+	  std::array<std::array<double, 256>, 256> ToTmap{};
+	  void Fill(int col, int row, double ToT) {
+		  ToTmap[col][row]=ToT;
+	  }
+	  bool isFilled(int i, int j) {
+		  return not isZero(ToTmap[i][j]);
+	  }
+	  int getNNeighbours(int i, int j) {
+		  int nNeighbours=0;
+		  for(int a=-1; a<=1; a++) {
+			  for(int b=-1; b<=1; b++) {
+				  if(a==b) continue;
+				  if(i+a<0 or j+b<0 or i+a>=256 or j+b>=256) continue; //out of grid
+				  if( isFilled(i+a,j+b) ) ++nNeighbours;
+			  }
+		  }
+		  return nNeighbours;
+	  }
+	  bool isIsolated(int i, int j) {
+		  return not getNNeighbours(i,j);
+	  }
+	  bool isPair(int i, int j) {
+		  if(getNNeighbours(i,j)!=1) return false;
+		  //has one neighbour, find it and check if also one neighbour.
+		  for(int a=-1; a<=1; a++) {
+			  for(int b=-1; b<=1; b++) {
+				  if(a==b) continue;
+				  if(i+a<0 or j+b<0 or i+a>=256 or j+b>=256) continue; //out of grid
+				  if( isFilled(i+a,j+b) ) if(getNNeighbours(i+a,j+b)!=1) return false;
+			  }
+		  }
+		  return true;
+	  }
+	  std::vector<double> getIsolatedToTs() {
+		  std::vector<double> ToTs;
+		  for(int i=0; i<256; i++) {
+			  for(int j=0; j<256; j++) {
+				  if( isFilled(i,j) and isIsolated(i,j) ) {
+					  	ToTs.push_back(ToTmap[i][j]);
+				  }
+			  }
+		  }
+	  }
+};
+
 #pragma link C++ class std::vector<int>+;
 
 void resultProcessor::Loop()
@@ -223,6 +270,7 @@ void resultProcessor::Loop()
    std::deque<int> aggravatedHits;
    TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
    binnedHitsTree.Branch("hits", &hitsAlongTrack );
+   crosstalkCalculator crosstalk;
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
@@ -236,10 +284,12 @@ void resultProcessor::Loop()
 
  	  std::fill(hitsAlongTrack.begin(), hitsAlongTrack.end(), 0);
 
+
       for(auto& h : timepixHits->front() ) {
     	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
 
     	  hitmap.Fill( h.col, h.row );
+    	  crosstalk.Fill(h.col,h.row,h.ToT);
 
     	  double hryp=h.ry/cos(timepixFits->front().YZ.slope);
     	  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
