@@ -196,7 +196,7 @@ double truncatedSum(RAcontainer& binned, double fraction=0.7) {
 
 bool isZero(double x,double threshold=1E-30) { return fabs(x)<threshold; }
 struct crosstalkCalculator {
-	  std::array<std::array<double, 256>, 256> ToTmap{};
+	  std::array<std::array<double, 256>, 256> ToTmap{{}};
 	  void Fill(int col, int row, double ToT) {
 		  ToTmap[col][row]=ToT;
 	  }
@@ -207,7 +207,7 @@ struct crosstalkCalculator {
 		  int nNeighbours=0;
 		  for(int a=-1; a<=1; a++) {
 			  for(int b=-1; b<=1; b++) {
-				  if(a==b) continue;
+				  if(a==0 and b==0) continue;
 				  if(i+a<0 or j+b<0 or i+a>=256 or j+b>=256) continue; //out of grid
 				  if( isFilled(i+a,j+b) ) ++nNeighbours;
 			  }
@@ -217,14 +217,18 @@ struct crosstalkCalculator {
 	  bool isIsolated(int i, int j) {
 		  return not getNNeighbours(i,j);
 	  }
-	  bool isPair(int i, int j) {
+	  bool isPair(int i, int j) { //is part of pair
+		  if(not isFilled(i,j)) return false;
 		  if(getNNeighbours(i,j)!=1) return false;
 		  //has one neighbour, find it and check if also one neighbour.
 		  for(int a=-1; a<=1; a++) {
 			  for(int b=-1; b<=1; b++) {
-				  if(a==b) continue;
+				  if(a==0 and b==0) continue;
 				  if(i+a<0 or j+b<0 or i+a>=256 or j+b>=256) continue; //out of grid
-				  if( isFilled(i+a,j+b) ) if(getNNeighbours(i+a,j+b)!=1) return false;
+				  if( isFilled(i+a,j+b) ) {//neighbour of hit under inspection
+					  if(getNNeighbours(i+a,j+b)!=1) return false;
+					  if( std::abs(a)+std::abs(b)!=1  ) return false; //should be a direct neighbour! no diagonals
+				  }
 			  }
 		  }
 		  return true;
@@ -238,6 +242,19 @@ struct crosstalkCalculator {
 				  }
 			  }
 		  }
+//		  std::cout<<"isolated ToTs: "<<ToTs.size()<<"\n";
+		  return ToTs;
+	  }
+	  std::vector<double> getPairToTs() {
+		  std::vector<double> ToTs;
+		  for(int i=0; i<256; i++) {
+			  for(int j=0; j<256; j++) {
+				  if( isPair(i,j) ) {
+					  ToTs.push_back(ToTmap[i][j]);
+				  }
+			  }
+		  }
+		  return ToTs;
 	  }
 };
 
@@ -266,15 +283,17 @@ void resultProcessor::Loop()
    TH1D chargePerBin("chargePerBin", "chargePerBin", 400,0,400);
    TH1D aggravatedMeanHits("aggravatedHits", "mean per n bins", 400, 0, 400);
 
+   TH1D isolatedToT("isolatedToT","ToT of isolated hits", 40,0,2);
+   TH1D pairToT("pairToT","ToT of isolated hit-pairs", 40,0,2);
+
    std::vector<int> hitsAlongTrack(512);
    std::deque<int> aggravatedHits;
    TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
    binnedHitsTree.Branch("hits", &hitsAlongTrack );
-   crosstalkCalculator crosstalk;
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
-//	  std::cout<<"entry "<<jentry<<"\n";
+	  if(!(jentry%10000)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       auto nb = GetEntry(jentry);  nbytes += nb;
@@ -283,13 +302,14 @@ void resultProcessor::Loop()
        trackLength.Fill(timepixFrameFits.at(0).getTrackLength( timePixChip.zmin(), timePixChip.zmax() ));
 
  	  std::fill(hitsAlongTrack.begin(), hitsAlongTrack.end(), 0);
+ 	  crosstalkCalculator crosstalk;
 
 
       for(auto& h : timepixHits->front() ) {
     	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
 
     	  hitmap.Fill( h.col, h.row );
-    	  crosstalk.Fill(h.col,h.row,h.ToT);
+    	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
 
     	  double hryp=h.ry/cos(timepixFits->front().YZ.slope);
     	  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
@@ -320,7 +340,7 @@ void resultProcessor::Loop()
     	  }
       }
 
-      //sum hits
+      //sum hits for dEdx: fill corresponding tree and make histograms
       binnedHitsTree.Fill();
       {
     	  //view bins
@@ -348,6 +368,14 @@ void resultProcessor::Loop()
 
 //		  std::cout<<"total mean "<<truncatedMean(rebinnedHitsAlongTrack,1.)<<" truncated "<<mean<<"\n";
 //    	  if(std::cin.get()=='q') break;;
+      }
+
+      //check pair ToT
+      {
+    	  auto isolatedToTs=crosstalk.getIsolatedToTs();
+    	  for(auto& t : isolatedToTs) isolatedToT.Fill(t);
+    	  auto pairToTs=crosstalk.getPairToTs();
+    	  for(auto& t : pairToTs) pairToT.Fill(t);
       }
 
    }
