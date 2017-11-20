@@ -121,7 +121,9 @@ struct HoughTransformer {
 //		std::cout<<"drawing histogram of hough transform!"<<std::endl;
 //		graphicHistogram.Draw("colz");
 //		gPad->Update();
-//		if(std::cin.get()=='q') { throw graphicHistogram; //abuse of throw mechanism
+//		char c=std::cin.get();
+//		if(c=='w') {gPad->Print("houghHist.pdf");}
+//		if(c=='q') { throw graphicHistogram; //abuse of throw mechanism
 //		}
 
 		//get grid positions and sort by size

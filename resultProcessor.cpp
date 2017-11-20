@@ -1,13 +1,17 @@
 #include "resultProcessor.h"
 
 #include <deque>
+#include <utility>
 
 #include <TH2.h>
 #include <TStyle.h>
 #include <TCanvas.h>
 #include "TProfile2D.h"
+#include "TRandom.h"
 
 #include "testBeamSetup.h"
+#include "/user/cligtenb/rootmacros/getHistFromTree.h"
+//#include "/user/cligtenb/rootmacros/makeGraphsFromFits.h"
 
 resultProcessor::resultProcessor(TTree *tree) :
 	fChain(0),
@@ -203,54 +207,93 @@ struct crosstalkCalculator {
 	  bool isFilled(int i, int j) {
 		  return not isZero(ToTmap[i][j]);
 	  }
-	  int getNNeighbours(int i, int j) {
-		  int nNeighbours=0;
-		  for(int a=-1; a<=1; a++) {
-			  for(int b=-1; b<=1; b++) {
-				  if(a==0 and b==0) continue;
-				  if(i+a<0 or j+b<0 or i+a>=256 or j+b>=256) continue; //out of grid
-				  if( isFilled(i+a,j+b) ) ++nNeighbours;
+	  using Pattern=std::vector<std::vector<char>>;
+	  Pattern transpose(const Pattern& pat) {
+		  int csize=pat.size(), rsize=pat.at(0).size();
+		  Pattern n(rsize, std::vector<char>(csize) );
+		  for(int a=0; a<csize; a++) {
+			  for(int b=0; b<rsize; b++) {
+				  n[b][a]=pat[a][b];
 			  }
 		  }
-		  return nNeighbours;
+		  return n;
 	  }
-	  bool isIsolated(int i, int j) {
-		  return not getNNeighbours(i,j);
-	  }
-	  bool isPair(int i, int j) { //is part of pair
-		  if(not isFilled(i,j)) return false;
-		  if(getNNeighbours(i,j)!=1) return false;
-		  //has one neighbour, find it and check if also one neighbour.
-		  for(int a=-1; a<=1; a++) {
-			  for(int b=-1; b<=1; b++) {
-				  if(a==0 and b==0) continue;
-				  if(i+a<0 or j+b<0 or i+a>=256 or j+b>=256) continue; //out of grid
-				  if( isFilled(i+a,j+b) ) {//neighbour of hit under inspection
-					  if(getNNeighbours(i+a,j+b)!=1) return false;
-					  if( std::abs(a)+std::abs(b)!=1  ) return false; //should be a direct neighbour! no diagonals
+	  bool matchPattern(int i, int j, Pattern pat) {
+		  int csize=pat.size(), rsize=pat.at(0).size();
+		  if(i+csize>=256 or j+rsize>=256) return false;
+		  for(int a=0; a<csize; a++) {
+			  for(int b=0; b<rsize; b++) {
+				  bool isf=isFilled(i+a, j+b), isp=pat[a][b];
+				  if( (isf && !isp) or (!isf && isp) ) {
+					  return false;
 				  }
 			  }
 		  }
 		  return true;
 	  }
+	  std::vector<double> getToTsFromPattern(int i, int j, Pattern pat) {
+		  std::vector<double> ToTs;
+		  int csize=pat.size(), rsize=pat.at(0).size();
+		  if(i+csize>=256 or j+rsize>=256) return ToTs;
+		  for(int a=0; a<csize; a++) {
+			  for(int b=0; b<rsize; b++) {
+				  if(pat[a][b]) {
+					  auto& t=ToTmap[i+a][j+b];
+//					  std::cout<<t<<" ";
+					  if(t>0) ToTs.push_back( t );
+					  t=-1.; //flag as visited by setting negative
+				  }
+			  }
+		  }
+		  return ToTs;
+	  }
+	  const std::array<Pattern,2> isolated = {{
+			  { {0,0,0}, {0,1,0}, {0,0,0}, {0,0,0} },
+			  { {0,0,0}, {0,0,0}, {0,1,0}, {0,0,0} },
+	  }};
 	  std::vector<double> getIsolatedToTs() {
 		  std::vector<double> ToTs;
 		  for(int i=0; i<256; i++) {
 			  for(int j=0; j<256; j++) {
-				  if( isFilled(i,j) and isIsolated(i,j) ) {
-					  	ToTs.push_back(ToTmap[i][j]);
+				  for(const auto& p : isolated) { //loop over isolated patterns
+					  if( matchPattern(i,j,p) ) {
+//						  std::cout<<"pattern matched ";
+						  auto ToT=getToTsFromPattern(i,j,p);
+						  if(ToT.size()) ToTs.push_back(ToT.at(0)); //should be just one
+//						  else std::cout<<" but no TOT!!\n";
+						  break;
+					  }
+					  auto pT=transpose(p);
+					  if( matchPattern(i,j,pT) ) {
+						  auto ToT=getToTsFromPattern(i,j,pT);
+						  if(ToT.size()) ToTs.push_back(ToT.at(0)); //should be just one
+						  break;
+					  }
 				  }
 			  }
 		  }
 //		  std::cout<<"isolated ToTs: "<<ToTs.size()<<"\n";
 		  return ToTs;
 	  }
+	  const Pattern pair = {{
+			  {0,0,0}, {0,1,0}, {0,1,0}, {0,0,0}
+	  }};
 	  std::vector<double> getPairToTs() {
 		  std::vector<double> ToTs;
 		  for(int i=0; i<256; i++) {
 			  for(int j=0; j<256; j++) {
-				  if( isPair(i,j) ) {
-					  ToTs.push_back(ToTmap[i][j]);
+				  if( matchPattern(i,j,pair) ) {
+					  auto ToT=getToTsFromPattern(i,j,pair);
+					  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
+					  else if(ToT.size()!=0) std::cerr<<"expected 2 values!\n";
+					  break;
+				  }
+				  auto pT=transpose(pair);
+				  if( matchPattern(i,j,pT) ) {
+					  auto ToT=getToTsFromPattern(i,j,pT);
+					  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
+					  else if(ToT.size()!=0) std::cerr<<"expected 2 values, size was "<<ToT.size()<<"\n";
+					  break;
 				  }
 			  }
 		  }
@@ -274,8 +317,8 @@ void resultProcessor::Loop()
    TProfile2D deformationsxExp("deformationsxExp", "profile of x residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsy("deformationsy", "profile of y residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of x residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
-   TH2D diffusionx("diffusionx", "x residuals as a function of drift distance", 50,4,20,40,-2,2);
-   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance", 50,4,20,40,-2,2);
+   TH2D diffusionx("diffusionx", "x residuals as a function of drift distance;Drift distance [mm];x-residual [mm]", 50,4,20,40,-2,2);
+   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,20,40,-2,2);
 
    TH1D trackLength("trackLength", "length of track in tpc", 40,13,16);
    TH1D truncatedSumHits("truncatedSumHits", "mean per n bins", 100, 0, 100);
@@ -291,9 +334,16 @@ void resultProcessor::Loop()
    TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
    binnedHitsTree.Branch("hits", &hitsAlongTrack );
 
+   TH1* hitHist=getHistFromTree(fChain,"timepixClusterSize", "", "nhitsHist");
+   double actualNumberOfHits=getMeanFromSimpleGausFit(*hitHist);
+   double targetNumberOfHits=69.541; //from 330 V run333
+   std::cout<<"actual number of hits :"<<actualNumberOfHits<<", hits will be dropped to reach target "<<targetNumberOfHits<<"hits \n";
+
    Long64_t nbytes = 0, nb = 0;
-   for (Long64_t jentry=0; jentry<nentries;jentry++) {
-	  if(!(jentry%10000)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
+   for (Long64_t jentry=0;
+		   jentry<nentries; //std::min(nentries,10000LL);
+		   jentry++) {
+	  if(!(jentry%500)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       auto nb = GetEntry(jentry);  nbytes += nb;
@@ -308,6 +358,9 @@ void resultProcessor::Loop()
       for(auto& h : timepixHits->front() ) {
     	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
 
+    	  //have a chance to drop hits
+    	  if(gRandom->Rndm() > targetNumberOfHits/actualNumberOfHits) continue;
+
     	  hitmap.Fill( h.col, h.row );
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
 
@@ -317,7 +370,7 @@ void resultProcessor::Loop()
     	  deformationsx.Fill( h.col, h.row+hryp/0.055, h.rx );
     	  deformationsy.Fill( h.col, h.row+hryp/0.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
 
-    	  diffusiony.Fill(h.x-h.rx, h.ry);
+    	  diffusiony.Fill(h.x-h.rx, hryp);
     	  diffusionx.Fill(h.x-h.rx, h.rx);
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
@@ -341,8 +394,9 @@ void resultProcessor::Loop()
       }
 
       //sum hits for dEdx: fill corresponding tree and make histograms
-      binnedHitsTree.Fill();
-      {
+      bool dodEdX=false;
+      if(dodEdX){
+          binnedHitsTree.Fill();
     	  //view bins
 //    	  TH1D hitsAlongTrackHist("hitsAlongTrackHist", "hits along track", hitsAlongTrack.size(), 0, hitsAlongTrack.size() );
 //    	  std::vector<double> asDouble(hitsAlongTrack.begin(), hitsAlongTrack.end());
@@ -371,7 +425,8 @@ void resultProcessor::Loop()
       }
 
       //check pair ToT
-      {
+      bool doTopologicalMatching=false;
+      if(doTopologicalMatching){
     	  auto isolatedToTs=crosstalk.getIsolatedToTs();
     	  for(auto& t : isolatedToTs) isolatedToT.Fill(t);
     	  auto pairToTs=crosstalk.getPairToTs();

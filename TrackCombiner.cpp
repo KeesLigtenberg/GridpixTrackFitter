@@ -168,10 +168,10 @@ void putResidualsInEntry(
 
 }
 
-std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
+std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits, const Alignment& alignment) {
 	for(auto& h : hits) {
-		double Dy=0.089, Dx=0.0737;
-		double z0=3.642;
+		double Dy=0.07008, Dx=0.07609;
+		double z0=5.86;
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0);
 		double ds=timePixChip.driftSpeed;
 		h.error2x=1.56*1.56*ds*ds/12.+Dx*Dx*(h.x-z0); //1.56 is timePix3 time resolution
@@ -252,7 +252,7 @@ void TrackCombiner::processTracks() {
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits); //just a shift!
 		if(correctToTByCol) tpcHits=ToTCorrection.correct(tpcHits);
-		tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
+		if(correctTimewalk) tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
 		tpcHits=setTPCErrors(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {

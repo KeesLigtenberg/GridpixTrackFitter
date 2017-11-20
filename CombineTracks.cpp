@@ -15,7 +15,7 @@ using namespace std;
 //returns correlation factor
 void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displayEvent=false) {
 
-	bool doAlignment=true;
+	bool doAlignment=false;
 	if(!displayEvent and doAlignment) {
 		for(int i=0; i<3; ++i) {
 			TrackCombiner combiner(mimosaInput, timepixInput);

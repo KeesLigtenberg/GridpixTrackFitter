@@ -110,6 +110,7 @@ private:
 	int nTelescopeTriggers=0;
 	bool displayEvent=false;
 	bool correctToTByCol=true;
+	bool correctTimewalk=true;
 	std::deque<int> tpcEntryHasMatchingFit{};
 
 	std::unique_ptr<TFile, std::function<void(TFile*)> > outputFile{nullptr, [](TFile* f) { f->Close(); delete f;} };
