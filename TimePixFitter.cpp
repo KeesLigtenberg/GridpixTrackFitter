@@ -58,7 +58,7 @@ int TimePixFitter::makeMask(double ntimesThreshold) {
 }
 
 bool TimePixFitter::passEvent(const std::vector<PositionHit>& spaceHit) const {
-	const int nMinHits=20;//require at least 4 planes hit
+	const int nMinHits=30;//require at least 4 planes hit
 	return spaceHit.size()>nMinHits;
 }
 
