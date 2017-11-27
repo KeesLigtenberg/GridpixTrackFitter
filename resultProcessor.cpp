@@ -126,180 +126,198 @@ Int_t resultProcessor::Cut(Long64_t entry)
    return 1;
 }
 
-bool isInsideArea(int x, int y) {
-	if(x<=16 or x>=240) {return false;}
-	if(y< 80-50./225*x) return false;
-	return true;
-}
+namespace {
+	namespace goodArea {
+		constexpr int xmin=20, xmax=236, ybl=80, ybr=32, yul=224, yur=156;
+		//create box
+		const TBox excluded1(100,116,116,140),
+				excluded2(80,56,88,136);
+	}
+	bool isInsideArea(int x, int y) {
+		using namespace goodArea;
+		//area:|_--_
+		//	     --_|
+		if(x<=xmin or x>=xmax) {return false;}
+		if( (y<= ybl-ybr/double(xmax)*(x-xmin))
+		 or (y>= yul-yur/double(xmax)*(x-xmin)) ) { return false; }
+		if(excluded1.IsInside(x,y) or excluded2.IsInside(x,y)) { return false; }
+		return true;
+	}
 
-TProfile2D* removeBinsWithFewerEntries(TProfile2D* h, int minEntries){
-	for(int x=1; x<=h->GetNbinsX(); x++) {
-		for(int y=1; y<=h->GetNbinsY(); y++) {
-			int bin=h->GetBin(x,y);
-			if( h->GetBinEntries(bin) < minEntries
-//					or !isInsideArea( h->GetXaxis()->GetBinCenter(x), h->GetYaxis()->GetBinCenter(y) )
-				) {
-				h->SetBinEntries(bin, 0);
+	TProfile2D* removeBinsWithFewerEntries(TProfile2D* h, int minEntries){
+		for(int x=1; x<=h->GetNbinsX(); x++) {
+			for(int y=1; y<=h->GetNbinsY(); y++) {
+				int bin=h->GetBin(x,y);
+				if( h->GetBinEntries(bin) < minEntries
+	//					or !isInsideArea( h->GetXaxis()->GetBinCenter(x), h->GetYaxis()->GetBinCenter(y) )
+					) {
+					h->SetBinEntries(bin, 0);
+				}
 			}
 		}
+		return h;
 	}
-	return h;
-}
 
 
-//do frequency on an unweighted histogram, i.e. all entreis should have same weight
-void getFrequencyHistogram(TProfile2D* original, double systematicError, double min=-0.1, double max=0.1, int nBins=40, double entryWeight=1.0) {
-	TH1D* frequencyHist=new TH1D(
-		(original->GetName()+std::string("freq")).c_str(),
-		(original->GetTitle()+std::string("frequency; frequency;")+original->GetXaxis()->GetTitle() ).c_str(),
-		nBins, min, max);
-	TH1D* frequencyPull=new TH1D(
-		(original->GetName()+std::string("freqPull")).c_str(),
-		(original->GetTitle()+std::string("frequencyPull; frequency;")+original->GetXaxis()->GetTitle() ).c_str(),
-		100, -5, 5);
-	for(int i=1;i<=original->GetNbinsX();i++) {
-		for(int j=1; j<=original->GetNbinsY();j++) {
-			int bin=original->GetBin(i,j);
-			if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
-			if( original->GetBinEntries(bin) > 0 ) {
+	//do frequency on an unweighted histogram, i.e. all entreis should have same weight
+	void getFrequencyHistogram(TProfile2D* original, double systematicError, double min=-0.2, double max=0.2, int nBins=80, double entryWeight=1.0) {
+		TH1D* frequencyHist=new TH1D(
+			(original->GetName()+std::string("freq")).c_str(),
+			(original->GetTitle()+std::string(" frequency;")+original->GetZaxis()->GetTitle()+";" ).c_str(),
+			nBins, min, max);
+		TH1D* frequencyHistAll=new TH1D(
+			(original->GetName()+std::string("freqAll")).c_str(),
+			(original->GetTitle()+std::string(" frequency (with hits outside area);")+original->GetZaxis()->GetTitle()+";" ).c_str(),
+			nBins, min, max);
+//		TH1D* frequencyPull=new TH1D(
+//			(original->GetName()+std::string("freqPull")).c_str(),
+//			(original->GetTitle()+std::string(" frequencyPull;")+original->GetZaxis()->GetTitle()+";Frequency" ).c_str(),
+//			100, -5, 5);
+		for(int i=1;i<=original->GetNbinsX();i++) {
+			for(int j=1; j<=original->GetNbinsY();j++) {
+				int bin=original->GetBin(i,j);
+				if( original->GetBinEntries(bin) <= 0 ) continue;
 				double binContent= original->GetBinContent(i,j); //possible rounding error here
 				double binError=original->GetBinError(i,j);
 				double error=sqrt(binError*binError+systematicError*systematicError);
+				frequencyHistAll->Fill(binContent);
+				if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
 				frequencyHist->Fill(binContent);
-				frequencyPull->Fill(binContent/error);
+//				frequencyPull->Fill(binContent/error);
+
 			}
 		}
 	}
-}
 
-std::vector<int> rebinHits(const std::vector<int>& hits, int startbin, int endbin, int nBinsPerNewBin) {
-	if(!(endbin-startbin)%nBinsPerNewBin) {
-		std::cerr<<"bins should exactly match range!\n"; throw 1;
+	std::vector<int> rebinHits(const std::vector<int>& hits, int startbin, int endbin, int nBinsPerNewBin) {
+		if(!(endbin-startbin)%nBinsPerNewBin) {
+			std::cerr<<"bins should exactly match range!\n"; throw 1;
+		}
+		std::vector<int> newBins((endbin-startbin)/nBinsPerNewBin);
+		for(int i = startbin; i<endbin; i++ ) {
+			newBins[(i-startbin)/nBinsPerNewBin]+=hits[i];
+		}
+		return newBins;
 	}
-	std::vector<int> newBins((endbin-startbin)/nBinsPerNewBin);
-	for(int i = startbin; i<endbin; i++ ) {
-		newBins[(i-startbin)/nBinsPerNewBin]+=hits[i];
+
+	double truncatedMean(std::vector<int>& binned, double fraction=0.7) {
+		  std::sort(binned.begin(), binned.end());
+		  int sumFirstN=binned.size()*fraction;
+		  double sum=std::accumulate(binned.begin(), binned.begin() + sumFirstN , 0);
+		  double mean=sum/sumFirstN;
+		  return mean;
 	}
-	return newBins;
-}
+	template <class RAcontainer=std::vector<int> >
+	double truncatedSum(RAcontainer& binned, double fraction=0.7) {
+		  std::sort(binned.begin(), binned.end());
+		  int sumFirstN=binned.size()*fraction;
+		  double sum=std::accumulate(binned.begin(), binned.begin() + sumFirstN , 0);
+		  return sum;
+	}
 
-double truncatedMean(std::vector<int>& binned, double fraction=0.7) {
-	  std::sort(binned.begin(), binned.end());
-	  int sumFirstN=binned.size()*fraction;
-	  double sum=std::accumulate(binned.begin(), binned.begin() + sumFirstN , 0);
-	  double mean=sum/sumFirstN;
-	  return mean;
-}
-template <class RAcontainer=std::vector<int> >
-double truncatedSum(RAcontainer& binned, double fraction=0.7) {
-	  std::sort(binned.begin(), binned.end());
-	  int sumFirstN=binned.size()*fraction;
-	  double sum=std::accumulate(binned.begin(), binned.begin() + sumFirstN , 0);
-	  return sum;
-}
-
-bool isZero(double x,double threshold=1E-30) { return fabs(x)<threshold; }
-struct crosstalkCalculator {
-	  std::array<std::array<double, 256>, 256> ToTmap{{}};
-	  void Fill(int col, int row, double ToT) {
-		  ToTmap[col][row]=ToT;
-	  }
-	  bool isFilled(int i, int j) {
-		  return not isZero(ToTmap[i][j]);
-	  }
-	  using Pattern=std::vector<std::vector<char>>;
-	  Pattern transpose(const Pattern& pat) {
-		  int csize=pat.size(), rsize=pat.at(0).size();
-		  Pattern n(rsize, std::vector<char>(csize) );
-		  for(int a=0; a<csize; a++) {
-			  for(int b=0; b<rsize; b++) {
-				  n[b][a]=pat[a][b];
-			  }
+	bool isZero(double x,double threshold=1E-30) { return fabs(x)<threshold; }
+	struct crosstalkCalculator {
+		  std::array<std::array<double, 256>, 256> ToTmap{{}};
+		  void Fill(int col, int row, double ToT) {
+			  ToTmap[col][row]=ToT;
 		  }
-		  return n;
-	  }
-	  bool matchPattern(int i, int j, Pattern pat) {
-		  int csize=pat.size(), rsize=pat.at(0).size();
-		  if(i+csize>=256 or j+rsize>=256) return false;
-		  for(int a=0; a<csize; a++) {
-			  for(int b=0; b<rsize; b++) {
-				  bool isf=isFilled(i+a, j+b), isp=pat[a][b];
-				  if( (isf && !isp) or (!isf && isp) ) {
-					  return false;
+		  bool isFilled(int i, int j) {
+			  return not isZero(ToTmap[i][j]);
+		  }
+		  using Pattern=std::vector<std::vector<char>>;
+		  Pattern transpose(const Pattern& pat) {
+			  int csize=pat.size(), rsize=pat.at(0).size();
+			  Pattern n(rsize, std::vector<char>(csize) );
+			  for(int a=0; a<csize; a++) {
+				  for(int b=0; b<rsize; b++) {
+					  n[b][a]=pat[a][b];
 				  }
 			  }
+			  return n;
 		  }
-		  return true;
-	  }
-	  std::vector<double> getToTsFromPattern(int i, int j, Pattern pat) {
-		  std::vector<double> ToTs;
-		  int csize=pat.size(), rsize=pat.at(0).size();
-		  if(i+csize>=256 or j+rsize>=256) return ToTs;
-		  for(int a=0; a<csize; a++) {
-			  for(int b=0; b<rsize; b++) {
-				  if(pat[a][b]) {
-					  auto& t=ToTmap[i+a][j+b];
-//					  std::cout<<t<<" ";
-					  if(t>0) ToTs.push_back( t );
-					  t=-1.; //flag as visited by setting negative
+		  bool matchPattern(int i, int j, Pattern pat) {
+			  int csize=pat.size(), rsize=pat.at(0).size();
+			  if(i+csize>=256 or j+rsize>=256) return false;
+			  for(int a=0; a<csize; a++) {
+				  for(int b=0; b<rsize; b++) {
+					  bool isf=isFilled(i+a, j+b), isp=pat[a][b];
+					  if( (isf && !isp) or (!isf && isp) ) {
+						  return false;
+					  }
 				  }
 			  }
+			  return true;
 		  }
-		  return ToTs;
-	  }
-	  const std::array<Pattern,2> isolated = {{
-			  { {0,0,0}, {0,1,0}, {0,0,0}, {0,0,0} },
-			  { {0,0,0}, {0,0,0}, {0,1,0}, {0,0,0} },
-	  }};
-	  std::vector<double> getIsolatedToTs() {
-		  std::vector<double> ToTs;
-		  for(int i=0; i<256; i++) {
-			  for(int j=0; j<256; j++) {
-				  for(const auto& p : isolated) { //loop over isolated patterns
-					  if( matchPattern(i,j,p) ) {
-//						  std::cout<<"pattern matched ";
-						  auto ToT=getToTsFromPattern(i,j,p);
-						  if(ToT.size()) ToTs.push_back(ToT.at(0)); //should be just one
-//						  else std::cout<<" but no TOT!!\n";
+		  std::vector<double> getToTsFromPattern(int i, int j, Pattern pat) {
+			  std::vector<double> ToTs;
+			  int csize=pat.size(), rsize=pat.at(0).size();
+			  if(i+csize>=256 or j+rsize>=256) return ToTs;
+			  for(int a=0; a<csize; a++) {
+				  for(int b=0; b<rsize; b++) {
+					  if(pat[a][b]) {
+						  auto& t=ToTmap[i+a][j+b];
+	//					  std::cout<<t<<" ";
+						  if(t>0) ToTs.push_back( t );
+						  t=-1.; //flag as visited by setting negative
+					  }
+				  }
+			  }
+			  return ToTs;
+		  }
+		  const std::array<Pattern,2> isolated = {{
+				  { {0,0,0}, {0,1,0}, {0,0,0}, {0,0,0} },
+				  { {0,0,0}, {0,0,0}, {0,1,0}, {0,0,0} },
+		  }};
+		  std::vector<double> getIsolatedToTs() {
+			  std::vector<double> ToTs;
+			  for(int i=0; i<256; i++) {
+				  for(int j=0; j<256; j++) {
+					  for(const auto& p : isolated) { //loop over isolated patterns
+						  if( matchPattern(i,j,p) ) {
+	//						  std::cout<<"pattern matched ";
+							  auto ToT=getToTsFromPattern(i,j,p);
+							  if(ToT.size()) ToTs.push_back(ToT.at(0)); //should be just one
+	//						  else std::cout<<" but no TOT!!\n";
+							  break;
+						  }
+						  auto pT=transpose(p);
+						  if( matchPattern(i,j,pT) ) {
+							  auto ToT=getToTsFromPattern(i,j,pT);
+							  if(ToT.size()) ToTs.push_back(ToT.at(0)); //should be just one
+							  break;
+						  }
+					  }
+				  }
+			  }
+	//		  std::cout<<"isolated ToTs: "<<ToTs.size()<<"\n";
+			  return ToTs;
+		  }
+		  const Pattern pair = {{
+				  {0,0,0}, {0,1,0}, {0,1,0}, {0,0,0}
+		  }};
+		  std::vector<double> getPairToTs() {
+			  std::vector<double> ToTs;
+			  for(int i=0; i<256; i++) {
+				  for(int j=0; j<256; j++) {
+					  if( matchPattern(i,j,pair) ) {
+						  auto ToT=getToTsFromPattern(i,j,pair);
+						  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
+						  else if(ToT.size()!=0) std::cerr<<"expected 2 values!\n";
 						  break;
 					  }
-					  auto pT=transpose(p);
+					  auto pT=transpose(pair);
 					  if( matchPattern(i,j,pT) ) {
 						  auto ToT=getToTsFromPattern(i,j,pT);
-						  if(ToT.size()) ToTs.push_back(ToT.at(0)); //should be just one
+						  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
+						  else if(ToT.size()!=0) std::cerr<<"expected 2 values, size was "<<ToT.size()<<"\n";
 						  break;
 					  }
 				  }
 			  }
+			  return ToTs;
 		  }
-//		  std::cout<<"isolated ToTs: "<<ToTs.size()<<"\n";
-		  return ToTs;
-	  }
-	  const Pattern pair = {{
-			  {0,0,0}, {0,1,0}, {0,1,0}, {0,0,0}
-	  }};
-	  std::vector<double> getPairToTs() {
-		  std::vector<double> ToTs;
-		  for(int i=0; i<256; i++) {
-			  for(int j=0; j<256; j++) {
-				  if( matchPattern(i,j,pair) ) {
-					  auto ToT=getToTsFromPattern(i,j,pair);
-					  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
-					  else if(ToT.size()!=0) std::cerr<<"expected 2 values!\n";
-					  break;
-				  }
-				  auto pT=transpose(pair);
-				  if( matchPattern(i,j,pT) ) {
-					  auto ToT=getToTsFromPattern(i,j,pT);
-					  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
-					  else if(ToT.size()!=0) std::cerr<<"expected 2 values, size was "<<ToT.size()<<"\n";
-					  break;
-				  }
-			  }
-		  }
-		  return ToTs;
-	  }
-};
+	};
+}
 
 #pragma link C++ class std::vector<int>+;
 
@@ -313,12 +331,12 @@ void resultProcessor::Loop()
    TH2D hitmap("hitmap", "map of hits in tracks", 256,0,256,256,0,256 );
    TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
    const int nbins=64;
-   TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
-   TProfile2D deformationsxExp("deformationsxExp", "profile of x residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
-   TProfile2D deformationsy("deformationsy", "profile of y residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
-   TProfile2D deformationsx("deformationsx", "profile of x residuals", nbins, 0, 256, nbins, 0, 256, -1, 1);
-   TH2D diffusionx("diffusionx", "x residuals as a function of drift distance;Drift distance [mm];x-residual [mm]", 50,4,20,40,-2,2);
-   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,20,40,-2,2);
+   TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TProfile2D deformationsxExp("deformationsxExp", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,40,-2,2);
+   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,40,-2,2);
 
    TH1D trackLength("trackLength", "length of track in tpc", 40,13,16);
    TH1D truncatedSumHits("truncatedSumHits", "mean per n bins", 100, 0, 100);
@@ -337,13 +355,14 @@ void resultProcessor::Loop()
    TH1* hitHist=getHistFromTree(fChain,"timepixClusterSize", "", "nhitsHist");
    double actualNumberOfHits=getMeanFromSimpleGausFit(*hitHist);
    double targetNumberOfHits=69.541; //from 330 V run333
-   std::cout<<"actual number of hits :"<<actualNumberOfHits<<", hits will be dropped to reach target "<<targetNumberOfHits<<"hits \n";
+   bool dropHits=false;
+   if(dropHits) std::cout<<"actual number of hits :"<<actualNumberOfHits<<", hits will be dropped to reach target "<<targetNumberOfHits<<"hits \n";
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
 		   jentry<nentries; //std::min(nentries,10000LL);
 		   jentry++) {
-	  if(!(jentry%500)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
+	  if(!(jentry%1000)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       auto nb = GetEntry(jentry);  nbytes += nb;
@@ -356,22 +375,25 @@ void resultProcessor::Loop()
 
 
       for(auto& h : timepixHits->front() ) {
-    	  if(h.ToT*0.025<0.15 or h.flag<0) continue;
+    	  if(h.ToT*0.025<0.15 || fabs(h.rx)>2 ) continue;
+
+    	  double hryp=-h.ry/cos(timepixFits->front().YZ.slope);
+    	  diffusiony.Fill(h.x-h.rx, hryp);
+    	  diffusionx.Fill(h.x-h.rx, h.rx);
+
+    	  if(h.flag<0) continue;
 
     	  //have a chance to drop hits
-    	  if(gRandom->Rndm() > targetNumberOfHits/actualNumberOfHits) continue;
+    	  if(dropHits and gRandom->Rndm() > targetNumberOfHits/actualNumberOfHits) continue;
 
     	  hitmap.Fill( h.col, h.row );
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
 
-    	  double hryp=h.ry/cos(timepixFits->front().YZ.slope);
     	  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
-    	  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
-    	  deformationsx.Fill( h.col, h.row+hryp/0.055, h.rx );
-    	  deformationsy.Fill( h.col, h.row+hryp/0.055, h.ry/cos(timepixFits->front().YZ.slope) ); //todo: check where XZ slope enters
+    	  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, -hryp ); //todo: check where XZ slope enters
+    	  deformationsx.Fill( h.col, h.row, h.rx );
+    	  deformationsy.Fill( h.col, h.row, -hryp ); //todo: check where XZ slope enters
 
-    	  diffusiony.Fill(h.x-h.rx, hryp);
-    	  diffusionx.Fill(h.x-h.rx, h.rx);
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
 
@@ -434,16 +456,17 @@ void resultProcessor::Loop()
       }
 
    }
-   gStyle->SetPalette(1);
+   gStyle->SetPalette(kRainBow);
 
 
    std::vector<double> errorVector={0.005, .020, 0.005, .020};
-   auto error=errorVector.begin();
+   std::vector<double> minmaxVector={0.1,0.2,0.1,0.2};
+   auto error=errorVector.begin(), minmax=minmaxVector.begin();
    for(auto d : {&deformationsy, &deformationsx, &deformationsyExp, &deformationsxExp} ) {
-	   removeBinsWithFewerEntries(d, 100);
+	   d=removeBinsWithFewerEntries(d, 1000);
 	   getFrequencyHistogram(d, *error++);
-	   d->SetMinimum(-0.1);
-	   d->SetMaximum(0.1);
+	   d->SetMinimum(-*minmax);
+	   d->SetMaximum(*minmax++);
    }
 
    output.Write();
