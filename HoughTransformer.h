@@ -15,6 +15,7 @@
 #include "TLegend.h"
 #include "TPaletteAxis.h"
 #include "TPaveLabel.h"
+#include "TPaveStats.h"
 
 #include "PositionHit.h"
 #include "Hit.h"
@@ -93,6 +94,16 @@ struct HoughTransformer {
 	double angleOfTracksX=0., angleOfTracksY=0.;
 	
 
+	void changeStat(TH1&h) {
+		gPad->Update();
+		TPaveStats *st = (TPaveStats*)h.FindObject("stats");
+		st->SetX1NDC(0.12); st->SetY1NDC(0.83);
+		st->SetX2NDC(0.32); st->SetY2NDC(0.88);
+		st->SetLineWidth(0);
+		st->Draw();
+		gPad->Update();
+	}
+
 	//telescope
 	virtual std::list<HitCluster> operator() ( const std::vector< std::vector<PositionHit> >& hv  ) {
 
@@ -100,7 +111,11 @@ struct HoughTransformer {
 		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( xbins );
 		for(auto& v : houghGrid) v.resize(ybins);
 
-//		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
+		constexpr bool DrawHistogram=false;
+		std::unique_ptr<TH2D> graphicHistogram=DrawHistogram ?
+				std::make_unique<TH2D>("graphicHistogram", "Histogram of hough transform;x bin;y bin", xbins,0,xbins, ybins,0,ybins ):
+				nullptr;
+		static TCanvas* canv=new TCanvas("houghTelCanv", "Canvas with cluster histogram", 600,400);
 		for( int plane=0; plane<nPlanes; plane++ ) {
 			for(auto& h : hv[plane] ) {
 				int binx= (h.x-xmin-angleOfTracksX*h.z)/(xmax-xmin)*xbins;
@@ -113,18 +128,21 @@ struct HoughTransformer {
 				if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>( new HitCluster() );
 				houghGrid.at(binx).at(biny)->add(h, plane);
 
-//				graphicHistogram.Fill(binx,biny);
+				if(DrawHistogram) graphicHistogram->Fill(binx,biny);
 			}
 		}
 
 		//draw histogram
-//		std::cout<<"drawing histogram of hough transform!"<<std::endl;
-//		graphicHistogram.Draw("colz");
-//		gPad->Update();
-//		char c=std::cin.get();
-//		if(c=='w') {gPad->Print("houghHist.pdf");}
-//		if(c=='q') { throw graphicHistogram; //abuse of throw mechanism
-//		}
+		std::cout<<"drawing histogram of hough transform!"<<std::endl;
+		canv->cd();
+		gStyle->SetOptTitle(0);
+		gStyle->SetOptStat("e");
+		graphicHistogram->Draw("colz");
+		changeStat(*graphicHistogram);
+		canv->SetTicks(1,1);
+		char c=std::cin.get();
+		if(c=='w') {gPad->Print("telescopeCluster.pdf");}
+		if(c=='q') { throw graphicHistogram;} //abuse of throw mechanism
 
 		//get grid positions and sort by size
 		std::list< std::tuple<int, int, int> > gridPositions;
@@ -176,7 +194,9 @@ struct HoughTransformer {
 		constexpr bool DrawHistogram=false;
 		static TCanvas* canv=nullptr;
 		if(canv) canv->Clear();
-		TH2D graphicHistogram("graphicHistogram", "Histogram of hough transform", xbins,0,xbins, ybins,0,ybins );
+		std::unique_ptr<TH2D> graphicHistogram=DrawHistogram ?
+				std::make_unique<TH2D>("graphicHistogram", "Histogram of hough transform;x bin;y bin", xbins,0,xbins, ybins,0,ybins ):
+				nullptr;
 		for(auto& h : hv ) {
 			int binx= (h.x-xmin-angleOfTracksX*h.z)/(xmax-xmin)*xbins;
 			int biny= (h.y-angleOfTracksY*h.z)/ymax*ybins;
@@ -188,7 +208,7 @@ struct HoughTransformer {
 			if(!houghGrid.at(binx).at(biny)) houghGrid.at(binx).at(biny)=std::unique_ptr<HitCluster>( new HitCluster() );
 			houghGrid.at(binx).at(biny)->add(h);
 
-			if(DrawHistogram) graphicHistogram.Fill(binx,biny);
+			if(DrawHistogram) graphicHistogram->Fill(binx,biny);
 		}
 
 		//draw histogram
@@ -196,11 +216,13 @@ struct HoughTransformer {
 			std::cout<<"drawing histogram of hough transform!"<<std::endl;
 			if(!canv) canv=new TCanvas("houghCanv", "Canvas with cluster histogram", 600,400);
 			canv->cd();
-			graphicHistogram.Draw("colz");
+			graphicHistogram->Draw("colz");
+			changeStat(*graphicHistogram);
+			char c=std::cin.get();
+			canv->SetTicks(1,1);
 			gPad->Update();
-//			if(std::cin.get()=='q') {
-//				throw graphicHistogram; //abuse of throw mechanism
-//			}
+			if(c=='w') {gPad->Print("timepixCluster.pdf");}
+			if(c=='q') { throw graphicHistogram;} //abuse of throw mechanism
 		}
 
 		//get grid positions and sort by size
