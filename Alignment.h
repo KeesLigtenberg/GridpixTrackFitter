@@ -122,11 +122,12 @@ void checkHeader( std::istream& input, std::string name) {
 	}
 }
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
-	spaceHit.erase(
-			std::remove_if(spaceHit.begin(), spaceHit.end(), [this](const PositionHit&h) {return (h.ToT*0.025) <minToT;} ),
-			spaceHit.end()
-	);
+//	spaceHit.erase(
+//			std::remove_if(spaceHit.begin(), spaceHit.end(), [this](const PositionHit&h) {return (h.ToT*0.025) <minToT;} ),
+//			spaceHit.end()
+//	);
 	for(auto& h : spaceHit) {
+		if(h.ToT/40.<minToT) {h.flag=-3;};
 		h.x=h.x-coefficient/(h.ToT*0.025+shiftToT)+shiftx;
 	}
 	return spaceHit;
@@ -151,7 +152,7 @@ void TimeWalkCorrector::load(std::istream& input) {
 }
 
 void TimeWalkCorrector::calculate(TTree* tree) {
-		TH1* hist=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "", "profile", "profgoff");
+		TH1* hist=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0", "profile", "profgoff");
 //		gPad->Update();
 //		std::cin.get();
 
@@ -178,13 +179,15 @@ void TimeWalkCorrector::calculate(TTree* tree) {
 	}
 
 void RelativeAligner::calculate(TTree* tree) {
+	std::string eventcuts="timepixClusterSize/ntimepixHits>0.75 && timepixClusterSize>=30";
 	//calculate COM
 	//fill histogram with average from each track and get average from that, i.e. weight each track, not each hit
 	for(int i=0; i<3; i++) {
 		const auto x = std::array<std::string,3>{"x", "y", "z"}[i];
-		auto xhist=getHistFromTree(tree, "Sum$(timepixHits."+x+")/Length$(timepixHits)", "", x+"hist", "goff" );
+		auto xhist=getHistFromTree(tree, "Sum$(timepixHits."+x+")/Length$(timepixHits)", eventcuts, x+"hist", "goff" );
 //		gPad->Update();
 //		std::cin.get();
+		//todo: correct COM with actual center of mass from only passing hits
 		double xmean=getMeanFromGausFit(*xhist);
 		timepixCOM[i]=xmean;
 	}
@@ -194,7 +197,7 @@ void RelativeAligner::calculate(TTree* tree) {
 		//intercepts
 		auto zstring=std::to_string( timepixCOM.z() );//mean in Telescope frame -380+~6 =~-374
 		auto shiftHist=getHistFromTree(tree, "(telescopeFits[]."+axis+"Z.intercept+telescopeFits[]."+axis+"Z.slope*"+zstring+")-"
-			 "(timepixFits[0]."+axis+"Z.intercept+timepixFits[0]."+axis+"Z.slope*"+zstring+")", "", "shiftHist"+axis, "goff" );
+			 "(timepixFits[0]."+axis+"Z.intercept+timepixFits[0]."+axis+"Z.slope*"+zstring+")", eventcuts, "shiftHist"+axis, "goff" );
 //		gPad->Update();
 //		std::cin.get();
 		double shiftMean=getMeanFromGausFit(*shiftHist);
@@ -204,7 +207,7 @@ void RelativeAligner::calculate(TTree* tree) {
 
 		//angles
 		const std::string rotaxis= i ? "X" : "Y";
-		auto hist=getHistFromTree(tree, "timepixFits."+rotaxis+"Z.slope", "fabs(timepixFits."+rotaxis+"Z.slope)<0.2", "slopeHist"+rotaxis, "goff" );
+		auto hist=getHistFromTree(tree, "timepixFits."+rotaxis+"Z.slope", "fabs(timepixFits."+rotaxis+"Z.slope)<0.2 && "+eventcuts, "slopeHist"+rotaxis, "goff" );
 //		gPad->Update();
 //		std::cin.get();
 		double mean=getMeanFromGausFit(*hist);
@@ -214,16 +217,16 @@ void RelativeAligner::calculate(TTree* tree) {
 	}
 	//Z axis rotation
 	auto comx=std::to_string(timepixCOM.x()), comy=std::to_string(timepixCOM.y());
+	std::string avgx="Sum$(timepixHits.x)/Length$(timepixHits)", avgy="Sum$(timepixHits.y)/Length$(timepixHits)";
 	auto zRotation=getHistFromTree(tree,
-			"(-dyz*(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+")"
-			"+dxz*(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+"))"
-			"/(pow(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+", 2)+pow(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+",2))",
-			"(pow(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+", 2)+pow(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+",2))"
+			"(-dyz*("+avgx+"-"+comx+")+dxz*("+avgy+"-"+comy+"))"
+			"/(pow("+avgx+"-"+comx+", 2)+pow("+avgy+"-"+comy+",2))",
+			"(pow("+avgx+"-"+comx+", 2)+pow("+avgy+"-"+comy+",2))"
 			"*(fabs("
-			"(-dyz*(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+")"
-			"+dxz*(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+"))"
-			"/(pow(Sum$(timepixHits.x)/Length$(timepixHits)-"+comx+", 2)+pow(Sum$(timepixHits.y)/Length$(timepixHits)-"+comy+",2))"
-			")<1)"
+			"(-dyz*("+avgx+"-"+comx+")"
+			"+dxz*("+avgy+"-"+comy+"))"
+			"/(pow("+avgx+"-"+comx+", 2)+pow("+avgy+"-"+comy+",2))"
+			"))<1 && timepixHits.flag>0 && "+eventcuts
 			, "zRotHist", "goff");
 	double zAngle=getMeanFromGausFit(*zRotation);
 	angle[2]-=zAngle;
