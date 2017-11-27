@@ -133,16 +133,18 @@ struct HoughTransformer {
 		}
 
 		//draw histogram
-		std::cout<<"drawing histogram of hough transform!"<<std::endl;
-		canv->cd();
-		gStyle->SetOptTitle(0);
-		gStyle->SetOptStat("e");
-		graphicHistogram->Draw("colz");
-		changeStat(*graphicHistogram);
-		canv->SetTicks(1,1);
-		char c=std::cin.get();
-		if(c=='w') {gPad->Print("telescopeCluster.pdf");}
-		if(c=='q') { throw graphicHistogram;} //abuse of throw mechanism
+		if(DrawHistogram) {
+			std::cout<<"drawing histogram of hough transform!"<<std::endl;
+			canv->cd();
+			gStyle->SetOptTitle(0);
+			gStyle->SetOptStat("e");
+			graphicHistogram->Draw("colz");
+			changeStat(*graphicHistogram);
+			canv->SetTicks(1,1);
+			char c=std::cin.get();
+			if(c=='w') {gPad->Print("telescopeCluster.pdf");}
+			if(c=='q') { throw graphicHistogram;} //abuse of throw mechanism
+		}
 
 		//get grid positions and sort by size
 		std::list< std::tuple<int, int, int> > gridPositions;
