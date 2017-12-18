@@ -11,6 +11,7 @@
 
 #include "testBeamSetup.h"
 #include "/user/cligtenb/rootmacros/getHistFromTree.h"
+#include "goodArea.h"
 //#include "/user/cligtenb/rootmacros/makeGraphsFromFits.h"
 
 resultProcessor::resultProcessor(TTree *tree) :
@@ -127,22 +128,6 @@ Int_t resultProcessor::Cut(Long64_t entry)
 }
 
 namespace {
-	namespace goodArea {
-		constexpr int xmin=20, xmax=236, ybl=80, ybr=32, yul=224, yur=156;
-		//create box
-		const TBox excluded1(100,116,116,140),
-				excluded2(80,56,88,136);
-	}
-	bool isInsideArea(int x, int y) {
-		using namespace goodArea;
-		//area:|_--_
-		//	     --_|
-		if(x<=xmin or x>=xmax) {return false;}
-		if( (y<= ybl-ybr/double(xmax)*(x-xmin))
-		 or (y>= yul-yur/double(xmax)*(x-xmin)) ) { return false; }
-		if(excluded1.IsInside(x,y) or excluded2.IsInside(x,y)) { return false; }
-		return true;
-	}
 
 	TProfile2D* removeBinsWithFewerEntries(TProfile2D* h, int minEntries){
 		for(int x=1; x<=h->GetNbinsX(); x++) {
@@ -155,6 +140,20 @@ namespace {
 				}
 			}
 		}
+		return h;
+	}
+
+	TProfile2D* setMinMax(TProfile2D* h, double min, double max){
+		for(int x=1; x<=h->GetNbinsX(); x++) {
+			for(int y=1; y<=h->GetNbinsY(); y++) {
+				int bin=h->GetBin(x,y);
+				double bc=h->GetBinContent(bin);
+				if( bc < min ) { h->SetBinContent(bin, min); h->SetBinEntries(bin,1);}
+				else if(bc > max) { h->SetBinContent(bin,max); h->SetBinEntries(bin,1);}
+			}
+		}
+		h->SetMinimum(min);
+		h->SetMaximum(max);
 		return h;
 	}
 
@@ -181,7 +180,7 @@ namespace {
 				double binError=original->GetBinError(i,j);
 				double error=sqrt(binError*binError+systematicError*systematicError);
 				frequencyHistAll->Fill(binContent);
-				if(!isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
+				if(!goodArea::isInsideArea( original->GetXaxis()->GetBinCenter(i), original->GetYaxis()->GetBinCenter(j) )) continue;
 				frequencyHist->Fill(binContent);
 //				frequencyPull->Fill(binContent/error);
 
@@ -218,13 +217,16 @@ namespace {
 	bool isZero(double x,double threshold=1E-30) { return fabs(x)<threshold; }
 	struct crosstalkCalculator {
 		  std::array<std::array<double, 256>, 256> ToTmap{{}};
+		  std::array<std::array<char, 256>, 256> flagmap{{}};
 		  void Fill(int col, int row, double ToT) {
 			  ToTmap[col][row]=ToT;
+			  flagmap[col][row]=1;
 		  }
 		  bool isFilled(int i, int j) {
-			  return not isZero(ToTmap[i][j]);
+			  auto& t=flagmap[i][j];
+			  return t>0;
 		  }
-		  using Pattern=std::vector<std::vector<char>>;
+		  using Pattern=std::vector<std::vector<char>>; //not bool, because vector<bool> is not vector<char>
 		  Pattern transpose(const Pattern& pat) {
 			  int csize=pat.size(), rsize=pat.at(0).size();
 			  Pattern n(rsize, std::vector<char>(csize) );
@@ -235,6 +237,7 @@ namespace {
 			  }
 			  return n;
 		  }
+		  //match pattern at i,j
 		  bool matchPattern(int i, int j, Pattern pat) {
 			  int csize=pat.size(), rsize=pat.at(0).size();
 			  if(i+csize>=256 or j+rsize>=256) return false;
@@ -248,6 +251,7 @@ namespace {
 			  }
 			  return true;
 		  }
+		  //assumes pattern was already matched
 		  std::vector<double> getToTsFromPattern(int i, int j, Pattern pat) {
 			  std::vector<double> ToTs;
 			  int csize=pat.size(), rsize=pat.at(0).size();
@@ -256,9 +260,8 @@ namespace {
 				  for(int b=0; b<rsize; b++) {
 					  if(pat[a][b]) {
 						  auto& t=ToTmap[i+a][j+b];
-	//					  std::cout<<t<<" ";
-						  if(t>0) ToTs.push_back( t );
-						  t=-1.; //flag as visited by setting negative
+						  ToTs.push_back( t );
+						  flagmap[1+a][j+b]=-1; //flag as visited by setting negative
 					  }
 				  }
 			  }
@@ -295,21 +298,24 @@ namespace {
 		  const Pattern pair = {{
 				  {0,0,0}, {0,1,0}, {0,1,0}, {0,0,0}
 		  }};
-		  std::vector<double> getPairToTs() {
-			  std::vector<double> ToTs;
+		  const Pattern controlPair = {{
+				  std::vector<char>{1},std::vector<char>{0},std::vector<char>{1}
+		  }};
+		  std::vector<std::pair<double,double>> getPairToTs(const Pattern& pattern) {
+			  std::vector<std::pair<double,double>> ToTs;
 			  for(int i=0; i<256; i++) {
 				  for(int j=0; j<256; j++) {
-					  if( matchPattern(i,j,pair) ) {
-						  auto ToT=getToTsFromPattern(i,j,pair);
-						  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
-						  else if(ToT.size()!=0) std::cerr<<"expected 2 values!\n";
+					  if( matchPattern(i,j,pattern) ) {
+						  auto ToT=getToTsFromPattern(i,j,pattern);
+						  if(ToT.size()==2) ToTs.push_back( std::minmax(ToT.at(0), ToT.at(1)) );
+						  else if(ToT.size()!=0) std::cerr<<"expected 2 values!\n"; //should be two!
 						  break;
 					  }
-					  auto pT=transpose(pair);
-					  if( matchPattern(i,j,pT) ) {
-						  auto ToT=getToTsFromPattern(i,j,pT);
-						  if(ToT.size()==2) ToTs.insert(ToTs.begin(), ToT.begin(), ToT.end() ); //should be two!
-						  else if(ToT.size()!=0) std::cerr<<"expected 2 values, size was "<<ToT.size()<<"\n";
+					  auto pTransp=transpose(pattern);
+					  if( matchPattern(i,j,pTransp) ) {
+						  auto ToT=getToTsFromPattern(i,j,pTransp);
+						  if(ToT.size()==2) ToTs.push_back( std::minmax(ToT.at(0), ToT.at(1)) );
+						  else if(ToT.size()!=0) std::cerr<<"expected 2 values, size was "<<ToT.size()<<"\n";//should be two!
 						  break;
 					  }
 				  }
@@ -344,8 +350,13 @@ void resultProcessor::Loop()
    TH1D chargePerBin("chargePerBin", "chargePerBin", 400,0,400);
    TH1D aggravatedMeanHits("aggravatedHits", "mean per n bins", 400, 0, 400);
 
-   TH1D isolatedToT("isolatedToT","ToT of isolated hits", 40,0,2);
-   TH1D pairToT("pairToT","ToT of isolated hit-pairs", 40,0,2);
+   TH1D isolatedToT("isolatedToT","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
+   TH1D pairToTMin("pairToTMin","ToT of isolated hit-pairs;ToT [#mu s];Entries", 40,0,2);
+   TH1D pairToTMax("pairToTMax","ToT of isolated hit-pairs;ToT [#mu s];Entries", 40,0,2);
+   TH1D pairZDiff("pairZDiff", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 40,0,.2);
+   TH1D pairToTMinControl("pairToTMinControl","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
+   TH1D pairToTMaxControl("pairToTMaxControl","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
+   TH1D pairZDiffControl("pairZDiffControl", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 40,0,.2);
 
    std::vector<int> hitsAlongTrack(512);
    std::deque<int> aggravatedHits;
@@ -355,12 +366,12 @@ void resultProcessor::Loop()
    TH1* hitHist=getHistFromTree(fChain,"timepixClusterSize", "", "nhitsHist");
    double actualNumberOfHits=getMeanFromSimpleGausFit(*hitHist);
    double targetNumberOfHits=69.541; //from 330 V run333
-   bool dropHits=false;
+   constexpr bool dropHits=false;
    if(dropHits) std::cout<<"actual number of hits :"<<actualNumberOfHits<<", hits will be dropped to reach target "<<targetNumberOfHits<<"hits \n";
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
-		   jentry<nentries; //std::min(nentries,10000LL);
+		   jentry<std::min(nentries,1000LL);//nentries; //
 		   jentry++) {
 	  if(!(jentry%1000)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
@@ -371,28 +382,30 @@ void resultProcessor::Loop()
        trackLength.Fill(timepixFrameFits.at(0).getTrackLength( timePixChip.zmin(), timePixChip.zmax() ));
 
  	  std::fill(hitsAlongTrack.begin(), hitsAlongTrack.end(), 0);
- 	  crosstalkCalculator crosstalk;
+ 	  crosstalkCalculator crosstalk, crosstalkZ;
 
 
       for(auto& h : timepixHits->front() ) {
+    	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
+    	  crosstalkZ.Fill(h.col,h.row,h.z);
     	  if(h.ToT*0.025<0.15 || fabs(h.rx)>2 ) continue;
 
     	  double hryp=-h.ry/cos(timepixFits->front().YZ.slope);
     	  diffusiony.Fill(h.x-h.rx, hryp);
     	  diffusionx.Fill(h.x-h.rx, h.rx);
 
+    	  hitmap.Fill( h.col, h.row );
+
     	  if(h.flag<0) continue;
 
     	  //have a chance to drop hits
     	  if(dropHits and gRandom->Rndm() > targetNumberOfHits/actualNumberOfHits) continue;
 
-    	  hitmap.Fill( h.col, h.row );
-    	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
 
     	  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
-    	  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, -hryp ); //todo: check where XZ slope enters
+    	  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, hryp ); //todo: check where XZ slope enters
     	  deformationsx.Fill( h.col, h.row, h.rx );
-    	  deformationsy.Fill( h.col, h.row, -hryp ); //todo: check where XZ slope enters
+    	  deformationsy.Fill( h.col, h.row, hryp ); //todo: check where XZ slope enters
 
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
@@ -447,12 +460,28 @@ void resultProcessor::Loop()
       }
 
       //check pair ToT
-      bool doTopologicalMatching=false;
+      constexpr bool doTopologicalMatching=true;
       if(doTopologicalMatching){
     	  auto isolatedToTs=crosstalk.getIsolatedToTs();
+    	  crosstalkZ.getIsolatedToTs();
     	  for(auto& t : isolatedToTs) isolatedToT.Fill(t);
-    	  auto pairToTs=crosstalk.getPairToTs();
-    	  for(auto& t : pairToTs) pairToT.Fill(t);
+    	  auto pairToTs=crosstalk.getPairToTs(crosstalk.pair);
+    	  auto pairZs=crosstalkZ.getPairToTs(crosstalkZ.pair);
+    	  if(pairToTs.size()!=pairZs.size()) {std::cerr<<"ToT vec "<<pairToTs.size()<<" is different length than Z vec "<<pairZs.size()<<" in "<<jentry<<"\n";}
+    	  auto pairZ=pairZs.begin();
+    	  for(auto& t : pairToTs) {
+    		  pairToTMin.Fill(t.first);
+    		  pairToTMax.Fill(t.second);
+    		  pairZDiff.Fill( pairZ->second-pairZ++->first );
+    	  }
+    	  auto pairControlToTs=crosstalk.getPairToTs(crosstalk.controlPair);
+    	  auto pairControlZs=crosstalkZ.getPairToTs(crosstalkZ.controlPair);
+    	  auto pairControlZ=pairControlZs.begin();
+    	  for(auto& t : pairControlToTs) {
+    		  pairToTMinControl.Fill(t.first);
+    		  pairToTMaxControl.Fill(t.second);
+    		  pairZDiffControl.Fill( pairControlZ->second-pairControlZ++->first );
+    	  }
       }
 
    }
@@ -465,8 +494,8 @@ void resultProcessor::Loop()
    for(auto d : {&deformationsy, &deformationsx, &deformationsyExp, &deformationsxExp} ) {
 	   d=removeBinsWithFewerEntries(d, 1000);
 	   getFrequencyHistogram(d, *error++);
-	   d->SetMinimum(-*minmax);
-	   d->SetMaximum(*minmax++);
+	   double max=*minmax++;
+	   setMinMax(d,-max,max);
    }
 
    output.Write();
