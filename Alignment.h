@@ -152,7 +152,8 @@ void TimeWalkCorrector::load(std::istream& input) {
 }
 
 void TimeWalkCorrector::calculate(TTree* tree) {
-		TH1* hist=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0", "profile", "profgoff");
+		//require to have passed cuts, except rx cut
+		TH1* hist=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0 || timepixHits.flag==-1", "profile", "profgoff");
 //		gPad->Update();
 //		std::cin.get();
 
@@ -213,7 +214,7 @@ void RelativeAligner::calculate(TTree* tree) {
 		double mean=getMeanFromGausFit(*hist);
 		angle[i]+= std::atan( i ? -mean : mean );
 
-		std::cout<<"added "<<axis<<"rotation is "<<std::atan(mean)<<"\n";
+		std::cout<<"added "<<axis<<" rotation is "<<std::atan(mean)<<"\n";
 	}
 	//Z axis rotation
 	auto comx=std::to_string(timepixCOM.x()), comy=std::to_string(timepixCOM.y());
@@ -226,8 +227,9 @@ void RelativeAligner::calculate(TTree* tree) {
 			"(-dyz*("+avgx+"-"+comx+")"
 			"+dxz*("+avgy+"-"+comy+"))"
 			"/(pow("+avgx+"-"+comx+", 2)+pow("+avgy+"-"+comy+",2))"
-			"))<1 && timepixHits.flag>0 && "+eventcuts
+			"))<1 && "+eventcuts
 			, "zRotHist", "goff");
+//	std::cout<<"got histogram zrotation\n";
 	double zAngle=getMeanFromGausFit(*zRotation);
 	angle[2]-=zAngle;
 	std::cout<<"added zrotation is "<<zAngle<<"\n";

@@ -199,7 +199,7 @@ HoughTransformer::HitCluster& cutOnResidualPulls(
 //	} );
 	for(auto& h : cluster) {
 		if( res->x*res->x/h.error2x > maxPullx*maxPullx) h.flag=-1;
-		if( res->y*res->y/h.error2y > maxPully*maxPully) h.flag=-2;
+		if( res->y*res->y/h.error2y > maxPully*maxPully) { h.flag=-2;}
 		++res;
 	}
 

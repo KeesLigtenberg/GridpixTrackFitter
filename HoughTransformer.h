@@ -112,9 +112,10 @@ struct HoughTransformer {
 		for(auto& v : houghGrid) v.resize(ybins);
 
 		constexpr bool DrawHistogram=false;
-		std::unique_ptr<TH2D> graphicHistogram=DrawHistogram ?
-				std::make_unique<TH2D>("graphicHistogram", "Histogram of hough transform;x bin;y bin", xbins,0,xbins, ybins,0,ybins ):
-				nullptr;
+		std::unique_ptr<TH2D> graphicHistogram{
+				DrawHistogram ?
+				new TH2D("graphicHistogram", "Histogram of hough transform;x bin;y bin", xbins,0,xbins, ybins,0,ybins):
+				nullptr };
 		static TCanvas* canv=new TCanvas("houghTelCanv", "Canvas with cluster histogram", 600,400);
 		for( int plane=0; plane<nPlanes; plane++ ) {
 			for(auto& h : hv[plane] ) {
@@ -196,9 +197,10 @@ struct HoughTransformer {
 		constexpr bool DrawHistogram=false;
 		static TCanvas* canv=nullptr;
 		if(canv) canv->Clear();
-		std::unique_ptr<TH2D> graphicHistogram=DrawHistogram ?
-				std::make_unique<TH2D>("graphicHistogram", "Histogram of hough transform;x bin;y bin", xbins,0,xbins, ybins,0,ybins ):
-				nullptr;
+		std::unique_ptr<TH2D> graphicHistogram{
+				DrawHistogram ?
+				new TH2D("graphicHistogram", "Histogram of hough transform;x bin;y bin", xbins,0,xbins, ybins,0,ybins ):
+				nullptr};
 		for(auto& h : hv ) {
 			int binx= (h.x-xmin-angleOfTracksX*h.z)/(xmax-xmin)*xbins;
 			int biny= (h.y-angleOfTracksY*h.z)/ymax*ybins;
@@ -306,7 +308,7 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 
 	for(auto& iHit : cluster ) {
 		h=iHit;
-		pointTree.Fill();
+		if(h.flag>0) pointTree.Fill();
 	}
 
 	gStyle->SetMarkerStyle(20);

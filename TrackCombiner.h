@@ -111,6 +111,7 @@ private:
 	bool displayEvent=false;
 	bool correctToTByCol=true;
 	bool correctTimewalk=true;
+	bool onlyUseInArea=false;
 	std::deque<int> tpcEntryHasMatchingFit{};
 
 	std::unique_ptr<TFile, std::function<void(TFile*)> > outputFile{nullptr, [](TFile* f) { f->Close(); delete f;} };

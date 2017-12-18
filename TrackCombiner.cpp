@@ -6,6 +6,7 @@
  */
 
 #include "TrackCombiner.h"
+#include "goodArea.h"
 
 using namespace std;
 
@@ -145,7 +146,7 @@ std::pair<HoughTransformer::HitCluster, HoughTransformer::HitCluster> splitClust
 	return {isTrue,isFalse};
 }
 
-void putResidualsInEntry(
+BufferedTreeFiller::TreeEntry& putResidualsInEntry(
 		BufferedTreeFiller::TreeEntry& treeEntry,
 		const HoughTransformer::HitCluster& cluster,
 		const FitResult3D& fit,
@@ -166,15 +167,17 @@ void putResidualsInEntry(
 	treeEntry.dyz=(average.z()*fit.YZ.slope+fit.YZ.intercept-average.y())/sqrt(1+fit.YZ.slope*fit.YZ.slope);
 	treeEntry.dxz=(average.z()*fit.XZ.slope+fit.XZ.intercept-average.x())/sqrt(1+fit.XZ.slope*fit.XZ.slope);
 
+	return treeEntry;
 }
 
-std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits, const Alignment& alignment) {
+std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 	for(auto& h : hits) {
-		double Dy=0.07008, Dx=0.07609;
-		double z0=5.86;
-		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0);
+		double Dy=0.09776, Dx=0.081;
+		double z0y=3.994, z0x=3.049;
+		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0y);
 		double ds=timePixChip.driftSpeed;
-		h.error2x=1.56*1.56*ds*ds/12.+Dx*Dx*(h.x-z0); //1.56 is timePix3 time resolution
+		double dx0=0.1764; //1.56*1.56*ds*ds/12.+...  //1.56 is timePix3 time resolution
+		h.error2x=Dx*Dx*(h.x-z0x)+dx0*dx0;
 	}
 	return hits;
 }
@@ -196,6 +199,16 @@ int getMaxNumberOfEmptyRows(const std::vector<PositionHit>& hits) {
 	return maxEmpty;
 }
 
+std::vector<PositionHit>& eraseOutsideArea(std::vector<PositionHit>& spaceHit) {
+	spaceHit.erase(
+			std::remove_if(spaceHit.begin(), spaceHit.end(), [](const PositionHit&h) {
+				return not goodArea::isInsideArea(h.column,h.row);
+			} ),
+			spaceHit.end()
+	);
+	return spaceHit;
+}
+
 void TrackCombiner::processTracks() {
 	const TVector3& timepixShift=alignment.relativeAlignment.shift;
 	const TVector3& rotationCOM=alignment.relativeAlignment.getCOM();
@@ -208,7 +221,7 @@ void TrackCombiner::processTracks() {
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(previousTriggerNumberBegin);
 	for(int telescopeEntryNumber=0,tpcEntryNumber=0;
-			telescopeEntryNumber<200000
+			telescopeEntryNumber<telescopeFitter.nEvents//1000000
 			;) {
 		triggerStatusHistogram.reset();
 		// Get Entry and match trigger Numbers
@@ -251,9 +264,9 @@ void TrackCombiner::processTracks() {
 		auto tpcHits=tpcFitter.getSpaceHits();
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits); //just a shift!
+		if(onlyUseInArea) tpcHits=eraseOutsideArea(tpcHits);
 		if(correctToTByCol) tpcHits=ToTCorrection.correct(tpcHits);
 		if(correctTimewalk) tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
-		tpcHits=setTPCErrors(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
@@ -262,6 +275,7 @@ void TrackCombiner::processTracks() {
 			h.RotatePosition(alignment.relativeAlignment.angle[2], rotationCOM, {0,0,1});
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
+		tpcHits=setTPCErrors(tpcHits);
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes, tpcEntryNumber); continue; };
 		vector<HoughTransformer::HitCluster> tpcFittedClusters; //todo: replace with actual cluster for removing hits from cluster
@@ -272,6 +286,7 @@ void TrackCombiner::processTracks() {
 			auto residuals=calculateResiduals(cluster, fit);
 //			cout<<cluster.size();
 			cluster=cutOnResidualPulls(cluster, residuals, 3, 2);
+//			cluster=cutOnResidualPulls(cluster, residuals, 5, 5);
 //			cout<<" - "<<cluster.size()<<"\n";
 			if(cluster.getNHitsUnflagged()<2) continue;
 			fit=regressionFit3d(cluster);
@@ -287,7 +302,7 @@ void TrackCombiner::processTracks() {
 //		cout<<"timepix passed!"<<endl;
 
 		//display event
-		if( displayEvent and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
+		if( displayEvent ) { //and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
 			drawEvent(tpcHits, telescopeFits);
 //			drawEvent(tpcFittedClusters.front(), tpcFits);
 //			{	HoughTransformer::drawCluster(tpcHits, combinedSetupForDrawing);
@@ -375,9 +390,9 @@ void TrackCombiner::processTracks() {
 					combinedFits.push_back(combinedFit);
 
 					if(doSplitForResiduals) {
-						putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);
+						treeEntry=putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);
 					} else {
-						putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcPlusOneFit, alignment);
+						treeEntry=putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcPlusOneFit, alignment);
 					}
 
 					++nmatched;
