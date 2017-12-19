@@ -336,13 +336,15 @@ void resultProcessor::Loop()
 
    TH2D hitmap("hitmap", "map of hits in tracks", 256,0,256,256,0,256 );
    TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
-   const int nbins=64;
+   const int nbins=256;
    TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsxExp("deformationsxExp", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,40,-2,2);
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,40,-2,2);
+
+   TH2D timewalk("timewalk", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
 
    TH1D trackLength("trackLength", "length of track in tpc", 40,13,16);
    TH1D truncatedSumHits("truncatedSumHits", "mean per n bins", 100, 0, 100);
@@ -371,7 +373,7 @@ void resultProcessor::Loop()
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
-		   jentry<std::min(nentries,1000LL);//nentries; //
+		   jentry<std::min(nentries,100000LL);//nentries; //
 		   jentry++) {
 	  if(!(jentry%1000)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
@@ -388,6 +390,11 @@ void resultProcessor::Loop()
       for(auto& h : timepixHits->front() ) {
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
     	  crosstalkZ.Fill(h.col,h.row,h.z);
+
+    	  if(h.flag>=-1) {
+    		  timewalk.Fill(h.ToT*0.025,h.rx+alignment.timeWalkCorrection.getCorrection(h.ToT));
+    	  }
+
     	  if(h.ToT*0.025<0.15 || fabs(h.rx)>2 ) continue;
 
     	  double hryp=-h.ry/cos(timepixFits->front().YZ.slope);
@@ -460,7 +467,7 @@ void resultProcessor::Loop()
       }
 
       //check pair ToT
-      constexpr bool doTopologicalMatching=true;
+      constexpr bool doTopologicalMatching=false;
       if(doTopologicalMatching){
     	  auto isolatedToTs=crosstalk.getIsolatedToTs();
     	  crosstalkZ.getIsolatedToTs();

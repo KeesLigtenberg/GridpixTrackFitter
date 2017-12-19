@@ -25,10 +25,7 @@
 
 class TimeWalkCorrector {
 public:
-	TimeWalkCorrector() : minToT(0.1), coefficient(0.06), shiftToT(0.4), shiftx(0.6) {}
-	TimeWalkCorrector(double minToT, double coefficient, double shiftt, double shiftx) :
-		minToT(minToT), shiftToT(shiftt), shiftx(shiftx), coefficient(coefficient)
-	{}
+	TimeWalkCorrector() : minToT(0.15), coeffa(0.36), coeffb(-0.7), coeffc(7), param(-0.1), shiftx(0.9) {}
 
 	std::vector<PositionHit>&  correct(std::vector<PositionHit>& spaceHit) const;
 	double getCorrection(double ToT) const;
@@ -38,7 +35,7 @@ public:
 	void save(std::ostream&) const;
 	void load(std::istream&);
 private:
-	double minToT, coefficient, shiftToT, shiftx;
+	double minToT, coeffa, coeffb, coeffc, param, shiftx;
 };
 
 
@@ -124,7 +121,7 @@ void checkHeader( std::istream& input, std::string name) {
 }
 
 double TimeWalkCorrector::getCorrection(double ToT) const {
-	return coefficient/(ToT*0.025+shiftToT)+shiftx;
+	return shiftx+1.(coeffa+coeffb*ToT+coeffc*ToT*ToT)+param*ToT;
 }
 
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
@@ -141,7 +138,7 @@ std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& s
 
 void TimeWalkCorrector::save(std::ostream& output) const {
 	output<<"TIMEWALKPARAMETERS\n"
-		  <<minToT<<" "<<shiftToT<<" "<<shiftx<<" "<<coefficient<<"\n";
+		  <<minToT<<" "<<coeffa<<" "<<coeffb<<" "<<coeffc<<" "<<param<<" "<<shiftx<<" "<<"\n";
 }
 
 void TimeWalkCorrector::load(std::istream& input) {
@@ -150,7 +147,7 @@ void TimeWalkCorrector::load(std::istream& input) {
 	if(header!="TIMEWALKPARAMETERS" or not input.good()) {
 		std::cerr<<"failed to read header TIMEWALKPARAMETERS\n"; throw 1;
 	}
-	input>>minToT>>shiftToT>>shiftx>>coefficient;
+	input>>minToT>>coeffa>>coeffb>>coeffc>>param>>shiftx;
 	if(not input.good() ) {
 		std::cerr<<"failed to read parameters\n";
 		throw 1;
@@ -175,19 +172,31 @@ void TimeWalkCorrector::calculate(TTree* tree) {
 			throw 1;
 		}
 
-		auto scoef=std::to_string(coefficient);
-		auto sToT=std::to_string(shiftToT);
+		auto sx=std::to_string(shiftx);
+		auto sa=std::to_string(coeffa);
+		auto sb=std::to_string(coeffb);
+		auto sc=std::to_string(coeffc);
+		auto sp=std::to_string(param);
 		//subtract old correction in fit of new one:
-		TF1* fun=new TF1("fun", ("[0]/(x+[1])+[2]-"+scoef+"/(x+"+sToT+")").c_str() );
+		TF1* fun=new TF1("fun", ( "[0]+1./([1]+[2]*x+[3]*x*x)+[4]*x-("+sx+"+1./("+sa+"+"+sb+"*x+"+sc+"*x*x)+"+sp+"*x)" ).c_str() );
 
 		TFitResultPtr fit=mean->Fit(fun, "SQ", "", minToT, 100);
 		if(!fit->IsValid()) { std::cerr<<"Time walk fit failed!\n"; throw 1;}
 
 		std::cout<<"Updated time walk parameters\n"
-				 <<"coefficient "<<coefficient<<" -> "<<fit->Parameter(0)<<"\n"
-				 <<"shiftToT "<<shiftToT<<" -> "<<fit->Parameter(1)<<"\n";
-		coefficient=fit->Parameter(0);
-		shiftToT=fit->Parameter(1);
+				 <<"coefficient "
+				 <<coeffa<<" "
+				 <<coeffb<<" "
+				 <<coeffc<<" "
+				 <<" -> "
+				 <<fit->Parameter(1)<<" "
+				 <<fit->Parameter(2)<<" "
+				 <<fit->Parameter(3)<<"\n"
+				 <<"param "<<param<<" -> "<<fit->Parameter(4)<<"\n";
+		coeffa=fit->Parameter(1);
+		coeffb=fit->Parameter(2);
+		coeffc=fit->Parameter(3);
+		param=fit->Parameter(4);
 	}
 
 void RelativeAligner::calculate(TTree* tree) {
