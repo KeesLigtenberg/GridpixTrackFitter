@@ -31,6 +31,7 @@ public:
 	{}
 
 	std::vector<PositionHit>&  correct(std::vector<PositionHit>& spaceHit) const;
+	double getCorrection(double ToT) const;
 
 	void calculate(TTree* tree);
 
@@ -121,6 +122,11 @@ void checkHeader( std::istream& input, std::string name) {
 		std::cerr<<"failed to read header "<<name<<"\n"; throw 1;
 	}
 }
+
+double TimeWalkCorrector::getCorrection(double ToT) const {
+	return coefficient/(ToT*0.025+shiftToT)+shiftx;
+}
+
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
 //	spaceHit.erase(
 //			std::remove_if(spaceHit.begin(), spaceHit.end(), [this](const PositionHit&h) {return (h.ToT*0.025) <minToT;} ),
@@ -128,7 +134,7 @@ std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& s
 //	);
 	for(auto& h : spaceHit) {
 		if(h.ToT/40.<minToT) {h.flag=-3;};
-		h.x=h.x-coefficient/(h.ToT*0.025+shiftToT)+shiftx;
+		h.x=h.x-getCorrection(h.ToT);
 	}
 	return spaceHit;
 }
@@ -152,15 +158,20 @@ void TimeWalkCorrector::load(std::istream& input) {
 }
 
 void TimeWalkCorrector::calculate(TTree* tree) {
+		//get th2
 		//require to have passed cuts, except rx cut
-		TH1* hist=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0 || timepixHits.flag==-1", "profile", "profgoff");
-//		gPad->Update();
-//		std::cin.get();
+		TH1* rxtot=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0 || timepixHits.flag==-1", "rxtot(200,0,2.5,100,-5,5)", "colgoff");
+		TH2D* th2 = dynamic_cast<TH2D*>(rxtot);
+		if(!th2) {
+			std::cerr<<"Could not get th2 from tree!\n";
+			throw 1;
+		}
 
-		TProfile* prof = dynamic_cast<TProfile*>(hist);
-
-		if(!prof) {
-			std::cerr<<"Could not get profile from tree!\n";
+		//fit slices y with gaus and get th1
+		th2->FitSlicesY();
+		TH1* mean=dynamic_cast<TH1*>(gDirectory->Get("rxtot_1"));
+		if(!mean) {
+			std::cerr<<"Could not get mean from th2!\n";
 			throw 1;
 		}
 
@@ -169,7 +180,7 @@ void TimeWalkCorrector::calculate(TTree* tree) {
 		//subtract old correction in fit of new one:
 		TF1* fun=new TF1("fun", ("[0]/(x+[1])+[2]-"+scoef+"/(x+"+sToT+")").c_str() );
 
-		TFitResultPtr fit=prof->Fit(fun, "SQ", "", minToT, 100);
+		TFitResultPtr fit=mean->Fit(fun, "SQ", "", minToT, 100);
 		if(!fit->IsValid()) { std::cerr<<"Time walk fit failed!\n"; throw 1;}
 
 		std::cout<<"Updated time walk parameters\n"
