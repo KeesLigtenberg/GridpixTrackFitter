@@ -121,7 +121,8 @@ void checkHeader( std::istream& input, std::string name) {
 }
 
 double TimeWalkCorrector::getCorrection(double ToT) const {
-	return shiftx+1.(coeffa+coeffb*ToT+coeffc*ToT*ToT)+param*ToT;
+	ToT*=0.025;
+	return shiftx+1./(coeffa+coeffb*ToT+coeffc*ToT*ToT)+param*ToT;
 }
 
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
