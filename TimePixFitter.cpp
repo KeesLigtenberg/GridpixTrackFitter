@@ -9,6 +9,7 @@
 
 #include "TSystem.h"
 #include "TView.h"
+#include "TRandom.h"
 
 //#include "/user/cligtenb/rootmacros/getObjectFromFile.h"
 #include "getObjectFromFile.h"
@@ -62,11 +63,29 @@ bool TimePixFitter::passEvent(const std::vector<PositionHit>& spaceHit) const {
 	return spaceHit.size()>nMinHits;
 }
 
+std::vector<TimePixHit>& addCrossTalk(std::vector<TimePixHit>& hv, double chance) {
+	for(const auto& h : hv) {
+		if(gRandom->Rndm()<chance) {
+			TimePixHit ct(h);
+			ct.charge/=10;
+			int pm= gRandom->Rndm()<0.5 ? -1 : 1;
+			if(gRandom->Rndm()<0.5) {
+				if(ct.column!=0 && ct.column!=255) ct.column+=pm;
+			} else {
+				if(ct.row!=0 && ct.row!=255)  ct.row+=pm;
+			}
+			hv.push_back(ct);
+		}
+	}
+	return hv;
+}
+
 std::vector<PositionHit> TimePixFitter::getSpaceHits() {
 	std::vector<PositionHit> spaceHit;
 	//apply mask
 	if (!mask.empty()) {
 		auto maskedHit = applyPixelMask(mask, *rawHits);
+		maskedHit = addCrossTalk(maskedHit, 0.01);
 		//convert rawHits to positions
 		const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/;
 		spaceHit=convertHits( maskedHit, detector.pixelsize, detector.pixelsize, driftScale );
