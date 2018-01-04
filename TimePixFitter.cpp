@@ -63,11 +63,18 @@ bool TimePixFitter::passEvent(const std::vector<PositionHit>& spaceHit) const {
 	return spaceHit.size()>nMinHits;
 }
 
-std::vector<TimePixHit>& addCrossTalk(std::vector<TimePixHit>& hv, double chance) {
-	for(const auto& h : hv) {
+std::vector<TimePixHit>& addCrossTalk(std::vector<TimePixHit>& hv, double chance, const TimeWalkCorrector& twc) {
+	for(auto& h : hv) {
 		if(gRandom->Rndm()<chance) {
+			//timewalk correct, copy, undo correction
+			const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/;
+			h.driftTime+=twc.getCorrection(h.charge)/driftScale;
 			TimePixHit ct(h);
-			ct.charge/=10;
+			double fraction=gRandom->Rndm();
+			ct.charge*=(1-fraction);
+			ct.driftTime-=twc.getCorrection(ct.charge)*driftScale;
+			h.charge*=fraction;
+			h.driftTime-=twc.getCorrection(h.charge)*driftScale;
 			int pm= gRandom->Rndm()<0.5 ? -1 : 1;
 			if(gRandom->Rndm()<0.5) {
 				if(ct.column!=0 && ct.column!=255) ct.column+=pm;
@@ -85,7 +92,19 @@ std::vector<PositionHit> TimePixFitter::getSpaceHits() {
 	//apply mask
 	if (!mask.empty()) {
 		auto maskedHit = applyPixelMask(mask, *rawHits);
-		maskedHit = addCrossTalk(maskedHit, 0.01);
+		//convert rawHits to positions
+		const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/;
+		spaceHit=convertHits( maskedHit, detector.pixelsize, detector.pixelsize, driftScale );
+	}
+	return spaceHit;
+}
+
+std::vector<PositionHit> TimePixFitter::getSpaceHits(const TimeWalkCorrector& twc) {
+	std::vector<PositionHit> spaceHit;
+	//apply mask
+	if (!mask.empty()) {
+		auto maskedHit = applyPixelMask(mask, *rawHits);
+		maskedHit = addCrossTalk(maskedHit, 0.01, twc);
 		//convert rawHits to positions
 		const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/;
 		spaceHit=convertHits( maskedHit, detector.pixelsize, detector.pixelsize, driftScale );

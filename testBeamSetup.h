@@ -10,7 +10,7 @@
 
 
 struct TimePixDetectorConfiguration : DetectorConfiguration {
-	static constexpr double driftSpeed=0.075; //mm/ns
+	constexpr static double driftSpeed=0.075; //mm/ns
 	TimePixDetectorConfiguration() : DetectorConfiguration{
 		1, {0}, //nplanes, planeposition
 		0.055, 256, 256 //pixelsize, xpixels, ypixels

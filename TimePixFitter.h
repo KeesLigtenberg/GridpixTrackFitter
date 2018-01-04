@@ -18,6 +18,7 @@
 #include "PositionHit.h"
 #include "makeNoisyPixelMask.h"
 #include "linearRegressionFit.h"
+#include "Alignment.h"
 
 class ResidualHistogrammer;
 class TrackHistogrammer;
@@ -57,6 +58,7 @@ public:
 
 protected:
 	std::vector<PositionHit> getSpaceHits();
+	std::vector<PositionHit> getSpaceHits(const TimeWalkCorrector&);
 	std::vector<PositionHit>&  rotateAndShift(
 			std::vector<PositionHit>& spaceHit);
 

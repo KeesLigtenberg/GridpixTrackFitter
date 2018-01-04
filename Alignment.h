@@ -150,36 +150,46 @@ void TimeWalkCorrector::load(std::istream& input) {
 	}
 	input>>minToT>>coeffa>>coeffb>>coeffc>>param>>shiftx;
 	if(not input.good() ) {
-		std::cerr<<"failed to read parameters\n";
+		std::cerr<<"TimeWalkCorrector: failed to read parameters\n";
 		throw 1;
 	}
 }
 
+//THIS PROCEDURE IS NOT FUNCTIONAL!
 void TimeWalkCorrector::calculate(TTree* tree) {
+		std::cout<<"THIS PROCEDURE IS NOT FUNCTIONAL!\n";
 		//get th2
 		//require to have passed cuts, except rx cut
-		TH1* rxtot=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0 || timepixHits.flag==-1", "rxtot(200,0,2.5,100,-5,5)", "colgoff");
-		TH2D* th2 = dynamic_cast<TH2D*>(rxtot);
+		TH1* rxtot=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0 || timepixHits.flag==-1", "rxtot(100,0,2.5,200,-5,5)", "colzgoff");
+
+		TH2* th2 = dynamic_cast<TH2*>(rxtot);
 		if(!th2) {
 			std::cerr<<"Could not get th2 from tree!\n";
 			throw 1;
-		}
+		} else std::cout<<"got th2!\n";
 
 		//fit slices y with gaus and get th1
-		th2->FitSlicesY();
-		TH1* mean=dynamic_cast<TH1*>(gDirectory->Get("rxtot_1"));
+		static TF1* gaus=new TF1("gaus", "gaus(0)");
+		th2->FitSlicesY(gaus, 6);
+		std::cout<<"fitted slices\n";
+		TH1* mean=nullptr;
+		mean=(TH1*)(gDirectory->GetObjectChecked("rxtot_1", "TH1"));
 		if(!mean) {
 			std::cerr<<"Could not get mean from th2!\n";
 			throw 1;
-		}
+		} else std::cout<<"got mean!\n";
+		mean->Draw();
+		gPad->Update(); std::cin.get();
 
 		auto sx=std::to_string(shiftx);
 		auto sa=std::to_string(coeffa);
 		auto sb=std::to_string(coeffb);
 		auto sc=std::to_string(coeffc);
 		auto sp=std::to_string(param);
+		auto funString="[0]+1./([1]+[2]*x+[3]*x*x)+[4]*x-("+sx+"+1./("+sa+"+"+sb+"*x+"+sc+"*x*x)+"+sp+"*x)";
+		std::cout<<"function: "<<funString<<"\n";
 		//subtract old correction in fit of new one:
-		TF1* fun=new TF1("fun", ( "[0]+1./([1]+[2]*x+[3]*x*x)+[4]*x-("+sx+"+1./("+sa+"+"+sb+"*x+"+sc+"*x*x)+"+sp+"*x)" ).c_str() );
+		TF1* fun=new TF1("fun", funString.c_str() );
 
 		TFitResultPtr fit=mean->Fit(fun, "SQ", "", minToT, 100);
 		if(!fit->IsValid()) { std::cerr<<"Time walk fit failed!\n"; throw 1;}
@@ -249,8 +259,9 @@ void RelativeAligner::calculate(TTree* tree) {
 			"+dxz*("+avgy+"-"+comy+"))"
 			"/(pow("+avgx+"-"+comx+", 2)+pow("+avgy+"-"+comy+",2))"
 			"))<1 && "+eventcuts
-			, "zRotHist", "goff");
+			, "zRotHist(100,-1,1)", "goff");
 //	std::cout<<"got histogram zrotation\n";
+//	zRotation->Draw(); gPad->Update(); std::cin.get();
 	double zAngle=getMeanFromGausFit(*zRotation);
 	angle[2]-=zAngle;
 	std::cout<<"added zrotation is "<<zAngle<<"\n";
@@ -270,7 +281,7 @@ void RelativeAligner::load(std::istream& input) {
 	shift.SetXYZ(x,y,z);
 	timepixCOM.SetXYZ(comx,comy,comz);
 	if(not input.good() ) {
-		std::cerr<<"failed to read parameters\n";
+		std::cerr<<"RelativeAligner: failed to read parameters\n";
 		throw 1;
 	}
 }

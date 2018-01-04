@@ -220,8 +220,8 @@ void TrackCombiner::processTracks() {
 
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(previousTriggerNumberBegin);
-	for(int telescopeEntryNumber=0,tpcEntryNumber=0;
-			telescopeEntryNumber<telescopeFitter.nEvents//1000000
+	for(int telescopeEntryNumber=0,tpcEntryNumber=0; //5000000, 2308829
+			telescopeEntryNumber<1E5//telescopeFitter.nEvents//1000000
 			;) {
 		triggerStatusHistogram.reset();
 		// Get Entry and match trigger Numbers
@@ -261,7 +261,7 @@ void TrackCombiner::processTracks() {
 
 		//timepix
 		tpcFits.clear();
-		auto tpcHits=tpcFitter.getSpaceHits();
+		auto tpcHits=tpcFitter.getSpaceHits(alignment.timeWalkCorrection); //timewalk for cross-talk insertion
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits); //just a shift!
 		if(onlyUseInArea) tpcHits=eraseOutsideArea(tpcHits);
@@ -532,7 +532,7 @@ void TrackCombiner::loadAlignment(std::string alignmentFile) {
 
 void TrackCombiner::saveAlignment(std::string alignmentFile) {
 	//calculate alignment
-	alignment.timeWalkCorrection.calculate(&treeBuffer.getTree());
+//	alignment.timeWalkCorrection.calculate(&treeBuffer.getTree());
 	alignment.relativeAlignment.calculate(&treeBuffer.getTree());
 
 	alignment.saveToFile(alignmentFile);

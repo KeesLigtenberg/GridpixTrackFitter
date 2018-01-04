@@ -16,12 +16,13 @@
 #include "TGraph.h"
 #include "TH1.h"
 
+#include "linearRegressionFit.h"
+#include "Alignment.h"
 #include "TrackFitter.h"
 #include "TimePixFitter.h"
 #include "linearRegressionFit.h"
 #include "ResidualHistogrammer.h"
 #include "HitEntry.h"
-#include "Alignment.h"
 
 
 #if 1 //root?

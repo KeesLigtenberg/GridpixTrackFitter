@@ -17,12 +17,15 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 
 	bool doAlignment=false;
 	if(!displayEvent and doAlignment) {
-		for(int i=0; i<3; ++i) {
+		for(int i=0; i<1; ++i) {
 			TrackCombiner combiner(mimosaInput, timepixInput);
+			cout<<"loading alignment\n";
 			combiner.loadAlignment("alignment.dat");
 			combiner.openFile("fitResults.root");
 			combiner.setDisplayEvent(displayEvent);
+			cout<<"processing tracks\n";
 			combiner.processTracks();
+			cout<<"saving alignment\n";
 			combiner.saveAlignment("alignment.dat");
 		}
 	} else {
