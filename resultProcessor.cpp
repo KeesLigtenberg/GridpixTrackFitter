@@ -323,6 +323,7 @@ namespace {
 			  return ToTs;
 		  }
 	};
+
 }
 
 #pragma link C++ class std::vector<int>+;
@@ -345,6 +346,7 @@ void resultProcessor::Loop()
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,40,-2,2);
 
    TH2D timewalk("timewalk", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
+   TH2D timewalkCorrected("timewalkCorrected", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
 
    TH1D trackLength("trackLength", "length of track in tpc", 40,13,16);
    TH1D truncatedSumHits("truncatedSumHits", "mean per n bins", 100, 0, 100);
@@ -355,10 +357,10 @@ void resultProcessor::Loop()
    TH1D isolatedToT("isolatedToT","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
    TH1D pairToTMin("pairToTMin","ToT of isolated hit-pairs;ToT [#mu s];Entries", 40,0,2);
    TH1D pairToTMax("pairToTMax","ToT of isolated hit-pairs;ToT [#mu s];Entries", 40,0,2);
-   TH1D pairZDiff("pairZDiff", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 40,0,.2);
+   TH1D pairZDiff("pairZDiff", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 30,0,3.515625);
    TH1D pairToTMinControl("pairToTMinControl","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
    TH1D pairToTMaxControl("pairToTMaxControl","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
-   TH1D pairZDiffControl("pairZDiffControl", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 40,0,.2);
+   TH1D pairZDiffControl("pairZDiffControl", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 30,0,3.515625);
 
    std::vector<int> hitsAlongTrack(512);
    std::deque<int> aggravatedHits;
@@ -373,9 +375,10 @@ void resultProcessor::Loop()
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
-		   jentry<std::min(nentries,100000LL);//nentries; //
+		   jentry<std::min(nentries,2000LL);//nentries; //
 		   jentry++) {
-	  if(!(jentry%1000)) std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
+	  if(!(jentry%10000))
+		  std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       auto nb = GetEntry(jentry);  nbytes += nb;
@@ -389,10 +392,13 @@ void resultProcessor::Loop()
 
       for(auto& h : timepixHits->front() ) {
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
-    	  crosstalkZ.Fill(h.col,h.row,h.z);
+    	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
+    	  crosstalkZ.Fill(h.col,h.row,h.x+dxTW);
 
-    	  if(h.flag>=-1) {
-    		  timewalk.Fill(h.ToT*0.025,h.rx+alignment.timeWalkCorrection.getCorrection(h.ToT));
+    	  if(h.flag==-3 or h.flag>=-1) {
+        	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
+    		  timewalk.Fill(h.ToT*0.025,h.rx+dxTW);
+    		  timewalkCorrected.Fill(h.ToT*0.025,h.rx);
     	  }
 
     	  if(h.ToT*0.025<0.15 || fabs(h.rx)>2 ) continue;
@@ -467,7 +473,7 @@ void resultProcessor::Loop()
       }
 
       //check pair ToT
-      constexpr bool doTopologicalMatching=false;
+      constexpr bool doTopologicalMatching=true;
       if(doTopologicalMatching){
     	  auto isolatedToTs=crosstalk.getIsolatedToTs();
     	  crosstalkZ.getIsolatedToTs();
