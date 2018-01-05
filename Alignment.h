@@ -25,7 +25,7 @@
 
 class TimeWalkCorrector {
 public:
-	TimeWalkCorrector() : minToT(0.15), coeffa(0.36), coeffb(-0.7), coeffc(7), param(-0.1), shiftx(0.9) {}
+	TimeWalkCorrector() : minToT(0.15), a0(0),a1(0),a2(0),b0(0),b1(0),b2(0),c0(0) {}
 
 	std::vector<PositionHit>&  correct(std::vector<PositionHit>& spaceHit) const;
 	double getCorrection(double ToT) const;
@@ -35,7 +35,7 @@ public:
 	void save(std::ostream&) const;
 	void load(std::istream&);
 private:
-	double minToT, coeffa, coeffb, coeffc, param, shiftx;
+	double minToT, a0,a1,a2,b0,b1,b2,b3,c0;
 };
 
 
@@ -122,7 +122,7 @@ void checkHeader( std::istream& input, std::string name) {
 
 double TimeWalkCorrector::getCorrection(double ToT) const {
 	ToT*=0.025;
-	return shiftx+1./(coeffa+coeffb*ToT+coeffc*ToT*ToT)+param*ToT;
+	return c0+(a0+a1*ToT+a2*ToT*ToT)/(b0+b1*ToT+b2*ToT*ToT+b3*ToT*ToT*ToT);
 }
 
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
@@ -138,8 +138,11 @@ std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& s
 }
 
 void TimeWalkCorrector::save(std::ostream& output) const {
-	output<<"TIMEWALKPARAMETERS\n"
-		  <<minToT<<" "<<coeffa<<" "<<coeffb<<" "<<coeffc<<" "<<param<<" "<<shiftx<<" "<<"\n";
+	output<<"TIMEWALKPARAMETERS\n";
+	for(double x : {minToT, a0,a1,a2,b0,b1,b2,b3,c0} ) {
+		output<<x<<" ";
+	}
+	output<<"\n";
 }
 
 void TimeWalkCorrector::load(std::istream& input) {
@@ -148,7 +151,7 @@ void TimeWalkCorrector::load(std::istream& input) {
 	if(header!="TIMEWALKPARAMETERS" or not input.good()) {
 		std::cerr<<"failed to read header TIMEWALKPARAMETERS\n"; throw 1;
 	}
-	input>>minToT>>coeffa>>coeffb>>coeffc>>param>>shiftx;
+	input>>minToT>>a0>>a1>>a2>>b0>>b1>>b2>>b3>>c0;
 	if(not input.good() ) {
 		std::cerr<<"TimeWalkCorrector: failed to read parameters\n";
 		throw 1;
