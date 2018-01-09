@@ -160,7 +160,9 @@ void TimeWalkCorrector::load(std::istream& input) {
 
 //THIS PROCEDURE IS NOT FUNCTIONAL!
 void TimeWalkCorrector::calculate(TTree* tree) {
-		std::cout<<"THIS PROCEDURE IS NOT FUNCTIONAL!\n";
+		std::cerr<<"THIS PROCEDURE IS NOT FUNCTIONAL!\n";
+		throw 1;
+		/*
 		//get th2
 		//require to have passed cuts, except rx cut
 		TH1* rxtot=getHistFromTree(tree, "timepixHits.rx:timepixHits.ToT*0.025", "timepixHits.flag>0 || timepixHits.flag==-1", "rxtot(100,0,2.5,200,-5,5)", "colzgoff");
@@ -211,6 +213,7 @@ void TimeWalkCorrector::calculate(TTree* tree) {
 		coeffb=fit->Parameter(2);
 		coeffc=fit->Parameter(3);
 		param=fit->Parameter(4);
+		*/
 	}
 
 void RelativeAligner::calculate(TTree* tree) {

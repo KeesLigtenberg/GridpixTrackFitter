@@ -261,7 +261,8 @@ void TrackCombiner::processTracks() {
 
 		//timepix
 		tpcFits.clear();
-		auto tpcHits=tpcFitter.getSpaceHits(alignment.timeWalkCorrection); //timewalk for cross-talk insertion
+		auto tpcHits=tpcFitter.getSpaceHits(); //timewalk for cross-talk insertion
+//		auto tpcHits=tpcFitter.getSpaceHitsWithCrossTalk(alignment.timeWalkCorrection); //timewalk for cross-talk insertion
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 20 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits); //just a shift!
 		if(onlyUseInArea) tpcHits=eraseOutsideArea(tpcHits);

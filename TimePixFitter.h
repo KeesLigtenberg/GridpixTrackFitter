@@ -58,7 +58,7 @@ public:
 
 protected:
 	std::vector<PositionHit> getSpaceHits();
-	std::vector<PositionHit> getSpaceHits(const TimeWalkCorrector&);
+	std::vector<PositionHit> getSpaceHitsWithCrossTalk(const TimeWalkCorrector&);
 	std::vector<PositionHit>&  rotateAndShift(
 			std::vector<PositionHit>& spaceHit);
 

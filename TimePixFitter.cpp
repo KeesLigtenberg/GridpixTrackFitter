@@ -99,7 +99,7 @@ std::vector<PositionHit> TimePixFitter::getSpaceHits() {
 	return spaceHit;
 }
 
-std::vector<PositionHit> TimePixFitter::getSpaceHits(const TimeWalkCorrector& twc) {
+std::vector<PositionHit> TimePixFitter::getSpaceHitsWithCrossTalk(const TimeWalkCorrector& twc) {
 	std::vector<PositionHit> spaceHit;
 	//apply mask
 	if (!mask.empty()) {
