@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include <array>
+#include <string>
 
 #include "TTree.h"
 #include "TProfile.h"
@@ -25,7 +26,7 @@
 
 class TimeWalkCorrector {
 public:
-	TimeWalkCorrector() : minToT(0.15), a0(0),a1(0),a2(0),b0(0),b1(0),b2(0),c0(0) {}
+	TimeWalkCorrector(){}
 
 	std::vector<PositionHit>&  correct(std::vector<PositionHit>& spaceHit) const;
 	double getCorrection(double ToT) const;
@@ -35,7 +36,10 @@ public:
 	void save(std::ostream&) const;
 	void load(std::istream&);
 private:
-	double minToT, a0,a1,a2,b0,b1,b2,b3,c0;
+	double minToT{0.15};
+	std::vector<double> params{};
+	std::unique_ptr<TF1> fun{};
+	std::string funString{};
 };
 
 
@@ -122,7 +126,11 @@ void checkHeader( std::istream& input, std::string name) {
 
 double TimeWalkCorrector::getCorrection(double ToT) const {
 	ToT*=0.025;
-	return c0+(a0+a1*ToT+a2*ToT*ToT)/(b0+b1*ToT+b2*ToT*ToT+b3*ToT*ToT*ToT);
+	if(fun)	return fun->Eval(ToT);
+	else {
+		std::cerr<<"error: function was not defined!"<<endl;
+		return 0;
+	}
 }
 
 std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& spaceHit) const {
@@ -139,10 +147,22 @@ std::vector<PositionHit>& TimeWalkCorrector::correct(std::vector<PositionHit>& s
 
 void TimeWalkCorrector::save(std::ostream& output) const {
 	output<<"TIMEWALKPARAMETERS\n";
-	for(double x : {minToT, a0,a1,a2,b0,b1,b2,b3,c0} ) {
+	output<<minToT<<" "<<params.size()<<"\n";
+	output<<funString<<"\n";
+	for(const auto& x : params) {
 		output<<x<<" ";
 	}
 	output<<"\n";
+}
+
+namespace {
+	void checkStream( std::istream& input ) {
+		if(not input.good() ) {
+			std::cerr<<"TimeWalkCorrector: failed to read parameters\n";
+			throw 1;
+		}
+	}
+
 }
 
 void TimeWalkCorrector::load(std::istream& input) {
@@ -151,10 +171,18 @@ void TimeWalkCorrector::load(std::istream& input) {
 	if(header!="TIMEWALKPARAMETERS" or not input.good()) {
 		std::cerr<<"failed to read header TIMEWALKPARAMETERS\n"; throw 1;
 	}
-	input>>minToT>>a0>>a1>>a2>>b0>>b1>>b2>>b3>>c0;
-	if(not input.good() ) {
-		std::cerr<<"TimeWalkCorrector: failed to read parameters\n";
-		throw 1;
+	int n;
+	checkStream(input);
+	input>>minToT>>n;
+	checkStream(input);
+	getline(input,funString);
+	checkStream(input);
+	fun=std::unique_ptr( new TF1("timewalkCorrection", funString.c_str()) );
+	for(int i=0; i<n; i++) {
+		double p;
+		input>>p;
+		params.push_back(p);
+		checkStream(input);
 	}
 }
 
