@@ -298,8 +298,11 @@ namespace {
 		  const Pattern pair = {{
 				  {0,0,0}, {0,1,0}, {0,1,0}, {0,0,0}
 		  }};
+//		  const Pattern controlPair = {{
+//				  std::vector<char>{1},std::vector<char>{0},std::vector<char>{1}
+//		  }};
 		  const Pattern controlPair = {{
-				  std::vector<char>{1},std::vector<char>{0},std::vector<char>{1}
+				  {0,0,0}, {0,1,0}, {0,0,0}, {0,1,0}
 		  }};
 		  std::vector<std::pair<double,double>> getPairToTs(const Pattern& pattern) {
 			  std::vector<std::pair<double,double>> ToTs;
@@ -375,9 +378,9 @@ void resultProcessor::Loop()
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
-		   jentry<std::min(nentries,2000LL);//nentries; //
+		   jentry<std::min(nentries,10000LL);//nentries; //
 		   jentry++) {
-	  if(!(jentry%10000))
+	  if(!(jentry%100))
 		  std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
@@ -393,7 +396,7 @@ void resultProcessor::Loop()
       for(auto& h : timepixHits->front() ) {
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
     	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
-    	  crosstalkZ.Fill(h.col,h.row,h.x+dxTW);
+    	  if(h.ToT*0.025>0.15) crosstalkZ.Fill(h.col,h.row,h.x+dxTW);
 
     	  if(h.flag==-3 or h.flag>=-1) {
         	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
@@ -479,21 +482,23 @@ void resultProcessor::Loop()
     	  crosstalkZ.getIsolatedToTs();
     	  for(auto& t : isolatedToTs) isolatedToT.Fill(t);
     	  auto pairToTs=crosstalk.getPairToTs(crosstalk.pair);
-    	  auto pairZs=crosstalkZ.getPairToTs(crosstalkZ.pair);
-    	  if(pairToTs.size()!=pairZs.size()) {std::cerr<<"ToT vec "<<pairToTs.size()<<" is different length than Z vec "<<pairZs.size()<<" in "<<jentry<<"\n";}
-    	  auto pairZ=pairZs.begin();
-    	  for(auto& t : pairToTs) {
+    	  for(const auto& t : pairToTs) {
     		  pairToTMin.Fill(t.first);
     		  pairToTMax.Fill(t.second);
-    		  pairZDiff.Fill( pairZ->second-pairZ++->first );
+    	  }
+    	  auto pairZs=crosstalkZ.getPairToTs(crosstalkZ.pair);
+//    	  if(pairToTs.size()!=pairZs.size()) {std::cerr<<"ToT vec "<<pairToTs.size()<<" is different length than Z vec "<<pairZs.size()<<" in "<<jentry<<"\n";}
+    	  for(const auto& z : pairZs) {
+    		  pairZDiff.Fill(z.second-z.first);
     	  }
     	  auto pairControlToTs=crosstalk.getPairToTs(crosstalk.controlPair);
-    	  auto pairControlZs=crosstalkZ.getPairToTs(crosstalkZ.controlPair);
-    	  auto pairControlZ=pairControlZs.begin();
     	  for(auto& t : pairControlToTs) {
     		  pairToTMinControl.Fill(t.first);
     		  pairToTMaxControl.Fill(t.second);
-    		  pairZDiffControl.Fill( pairControlZ->second-pairControlZ++->first );
+    	  }
+    	  auto pairControlZs=crosstalkZ.getPairToTs(crosstalkZ.controlPair);
+    	  for(const auto& z : pairControlZs) {
+    		  pairZDiffControl.Fill( z.second-z.first );
     	  }
       }
 

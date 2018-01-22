@@ -63,18 +63,21 @@ bool TimePixFitter::passEvent(const std::vector<PositionHit>& spaceHit) const {
 	return spaceHit.size()>nMinHits;
 }
 
+int roundToInt(double x) {return x+0.5;};
 std::vector<TimePixHit>& addCrossTalk(std::vector<TimePixHit>& hv, double chance, const TimeWalkCorrector& twc) {
 	for(auto& h : hv) {
 		if(gRandom->Rndm()<chance) {
-			//timewalk correct, copy, undo correction
+			//correct timewalk, copy, undo correction
 			const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/;
-			h.driftTime+=twc.getCorrection(h.charge)/driftScale;
 			TimePixHit ct(h);
+			auto originalCharge=h.charge;
 			double fraction=gRandom->Rndm();
-			ct.charge*=(1-fraction);
-			ct.driftTime-=twc.getCorrection(ct.charge)*driftScale;
-			h.charge*=fraction;
-			h.driftTime-=twc.getCorrection(h.charge)*driftScale;
+			ct.charge=roundToInt(ct.charge*(1-fraction));
+			h.charge=roundToInt(h.charge*fraction);
+			double smearing=gRandom->Gaus()*0.2;
+			ct.driftTime+=(twc.getCorrection(ct.charge)-twc.getCorrection(originalCharge))/driftScale;
+			h.driftTime+=(twc.getCorrection(h.charge)-twc.getCorrection(originalCharge))/driftScale;
+//			cout<<ct.driftTime<<" ("<<ct.charge<<") - "<<h.driftTime<<" ("<<h.charge<<")\n";
 			int pm= gRandom->Rndm()<0.5 ? -1 : 1;
 			if(gRandom->Rndm()<0.5) {
 				if(ct.column!=0 && ct.column!=255) ct.column+=pm;

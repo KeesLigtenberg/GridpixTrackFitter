@@ -17,7 +17,7 @@ struct PositionHit {
 			x(x), y(y), z(z), row(row), column(column), plane(plane), ToT(ToT), error2x(error2x), error2y(error2y) {};
 	double x,y,z;
 	int row, column, plane;
-	int ToT=1;
+	double ToT=1;
 	double error2x=1, error2y=1;
 	int flag=1;
 
