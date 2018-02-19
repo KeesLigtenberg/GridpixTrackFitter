@@ -370,7 +370,8 @@ void resultProcessor::Loop()
    TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
    binnedHitsTree.Branch("hits", &hitsAlongTrack );
 
-   TH1* hitHist=getHistFromTree(fChain,"timepixClusterSize", "", "nhitsHist");
+   TH1* hitHist=getHistFromTree(fChain,"timepixClusterSize", "", "nhitsHist(200,0,400)");
+   TH1D hitInAreaHist("nhitsInArea", "Number of hits inside area per event", 200,0,400);
    double actualNumberOfHits=getMeanFromSimpleGausFit(*hitHist);
    double targetNumberOfHits=69.541; //from 330 V run333
    constexpr bool dropHits=false;
@@ -378,9 +379,9 @@ void resultProcessor::Loop()
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
-		   jentry<std::min(nentries,10000LL);//nentries; //
+		   jentry<nentries; //std::min(nentries,10000LL);//
 		   jentry++) {
-	  if(!(jentry%100))
+	  if(!(jentry%1000))
 		  std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
@@ -392,6 +393,7 @@ void resultProcessor::Loop()
  	  std::fill(hitsAlongTrack.begin(), hitsAlongTrack.end(), 0);
  	  crosstalkCalculator crosstalk, crosstalkZ;
 
+ 	 int nHitsInsideArea=0;
 
       for(auto& h : timepixHits->front() ) {
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
@@ -442,10 +444,16 @@ void resultProcessor::Loop()
 
     		  ++hitsAlongTrack[2*(h.col-h.rz/.055)];
     	  }
+
+    	  int col=h.col-h.rz/.055;
+    	  if( col>20 && col<236 ) {
+    		  ++nHitsInsideArea;
+    	  }
       }
+      hitInAreaHist.Fill(nHitsInsideArea);
 
       //sum hits for dEdx: fill corresponding tree and make histograms
-      bool dodEdX=false;
+      constexpr bool dodEdX=false;
       if(dodEdX){
           binnedHitsTree.Fill();
     	  //view bins
@@ -476,7 +484,7 @@ void resultProcessor::Loop()
       }
 
       //check pair ToT
-      constexpr bool doTopologicalMatching=true;
+      constexpr bool doTopologicalMatching=false;
       if(doTopologicalMatching){
     	  auto isolatedToTs=crosstalk.getIsolatedToTs();
     	  crosstalkZ.getIsolatedToTs();

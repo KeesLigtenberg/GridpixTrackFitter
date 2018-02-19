@@ -128,7 +128,7 @@ double TimeWalkCorrector::getCorrection(double ToT) const {
 	ToT*=0.025;
 	if(fun)	return fun->Eval(ToT);
 	else {
-		std::cerr<<"error: function was not defined!"<<endl;
+		std::cerr<<"error: function was not defined!\n";
 		return 0;
 	}
 }
@@ -156,9 +156,9 @@ void TimeWalkCorrector::save(std::ostream& output) const {
 }
 
 namespace {
-	void checkStream( std::istream& input ) {
+	void checkStream( std::istream& input , std::string message="") {
 		if(not input.good() ) {
-			std::cerr<<"TimeWalkCorrector: failed to read parameters\n";
+			std::cerr<<"Failed to read parameters <<" << message <<"\n";
 			throw 1;
 		}
 	}
@@ -172,17 +172,19 @@ void TimeWalkCorrector::load(std::istream& input) {
 		std::cerr<<"failed to read header TIMEWALKPARAMETERS\n"; throw 1;
 	}
 	int n;
-	checkStream(input);
+	checkStream(input, "TimeWalkCorrector: header");
 	input>>minToT>>n;
-	checkStream(input);
+	checkStream(input, "TimeWalkCorrector: minToT n");
+	if(input.peek()=='\n') input.get();
 	getline(input,funString);
-	checkStream(input);
-	fun=std::unique_ptr( new TF1("timewalkCorrection", funString.c_str()) );
+	checkStream(input, "TimeWalkCorrector: funstring");
+	fun=std::unique_ptr<TF1>( new TF1("timewalkCorrection", funString.c_str()) );
 	for(int i=0; i<n; i++) {
 		double p;
 		input>>p;
 		params.push_back(p);
-		checkStream(input);
+		checkStream(input, "TimeWalkCorrector: parameter "+std::to_string(i) );
+		fun->SetParameter(i, p);
 	}
 }
 
