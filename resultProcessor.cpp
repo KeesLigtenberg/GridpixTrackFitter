@@ -115,16 +115,32 @@ void resultProcessor::Show(Long64_t entry)
    if (!fChain) return;
    fChain->Show(entry);
 }
+
+namespace {
+	double getFractionInTrack( const std::vector<HitEntry>& hv ) {
+		int total=hv.size();
+		int inTrack=std::count_if(hv.begin(), hv.end(), [](HitEntry& h) {
+			return fabs(h.ry)<25*0.55;
+		});
+		return double(inTrack)/total;
+	}
+}
+
 Int_t resultProcessor::Cut(Long64_t entry)
 {
 // This function may be called from Loop.
 // returns  1 if entry is accepted.
 // returns -1 otherwise.
-   if(timepixClusterSize->front()/double(ntimepixHits)<0.75) return -1;
-   if(timepixClusterSize->front()<30) return -1;
+   enum result : int { rejected=-1, accepted=1 };
+
+	//delta rejection
+//   if(timepixClusterSize->front()/double(ntimepixHits)<0.75) return rejected;
+   if( getFractionInTrack(timepixHits->front()) < 0.5 ) return rejected;
+
+   if(timepixClusterSize->front()<30) return rejected;
 //		   or timepixClusterSize->front()>300
 
-   return 1;
+   return accepted;
 }
 
 namespace {
