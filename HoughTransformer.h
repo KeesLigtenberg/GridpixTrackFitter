@@ -318,36 +318,40 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 	TH1* axisObject= dynamic_cast<TH1*>( gPad->GetPrimitive("htemp") );
 	auto zaxis=axisObject->GetZaxis();
 	zaxis->SetLimits(detector.xmin(),detector.xmax());
-	zaxis->SetTitle("pixel z-axis (drift direction) [mm]") ;
+	zaxis->SetTitle("z-axis (drift direction) [mm]") ;
 	auto yaxis=axisObject->GetYaxis();
-	yaxis->SetTitle("pixel y-axis [mm]");
+	yaxis->SetTitle("y-axis [mm]");
 	yaxis->SetLimits(detector.ymin(),detector.ymax());
 	auto xaxis=axisObject->GetXaxis();
 	xaxis->SetLimits(detector.zmin(),detector.zmax());
-	xaxis->SetTitle("pixel x-axis (beam direction) [mm]");
+	xaxis->SetTitle("x-axis (beam direction) [mm]");
 	for(auto axis : {xaxis, yaxis} )
-		axis->SetTitleOffset(1.6);
+		axis->SetTitleOffset(1.3);
+	for(auto axis : {xaxis, yaxis,zaxis} ) {
+		axis->SetTitleSize(0.05);
+		axis->SetLabelSize(0.05);
+	}
 //	axisObject->SetMaximum(totAxis);
 //	axisObject->SetMinimum(0);
 	axisObject->Draw("colz");
 //	std::cout<<"give angles!"<<std::endl;
 //	std::cin>>theta>>phi;
-	gPad->SetMargin(0.1,0.175,0.1,0.1);
+	gPad->SetMargin(0.1,0.175,0.15,0.1);//l r b t
 	gPad->Update();
 
 
 	TPaletteAxis* palette= dynamic_cast<TPaletteAxis*>(gPad->GetPrimitive("palette"));
 	if(!palette) throw "could not find paletteAxis!";
-	palette->SetX1NDC(0.875);
-	palette->SetX2NDC(0.925);
+	palette->SetX1NDC(0.85);
+	palette->SetX2NDC(0.90);
 	palette->SetY2NDC(0.74);
 	palette->SetY1NDC(0.1);
 	//draw TPaveText over Palette axis title
-	auto paletteAxisLabel = new TPaveLabel(0.97,0.1,1,0.75, "ToT [#mus]", "NDC");
+	auto paletteAxisLabel = new TPaveLabel(0.96,0.1,1,0.75, "ToT [#mus]", "NDC");
 	paletteAxisLabel->SetFillColor(kWhite);
 	paletteAxisLabel->SetBorderSize(0);
 	paletteAxisLabel->SetTextAngle(90);
-	paletteAxisLabel->SetTextSize(0.05);
+	paletteAxisLabel->SetTextSize(0.08);
 	paletteAxisLabel->SetTextFont(42);
 	paletteAxisLabel->SetTextAlign(kHAlignCenter+kVAlignCenter);
 	paletteAxisLabel->Draw();

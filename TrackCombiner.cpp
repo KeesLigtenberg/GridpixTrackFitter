@@ -14,6 +14,7 @@ using namespace std;
 template <class T> //std::vector<PositionHit>
 void TrackCombiner::drawEvent(const T& hits,
 		const std::vector<FitResult3D>& fits) {
+	std::cout<<"drawing event with "<<hits.size()<<" hits"<<endl;
 	static TCanvas* timepixCanv=new TCanvas(typeid(T).name(),"Display of timepix event", 600,400);
 	timepixCanv->cd();
 	auto& ra=alignment.relativeAlignment;
@@ -221,7 +222,7 @@ void TrackCombiner::processTracks() {
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(previousTriggerNumberBegin);
 	for(int telescopeEntryNumber=0,tpcEntryNumber=0; //5000000, 2308829
-			telescopeEntryNumber<1E5//telescopeFitter.nEvents//1000000
+			telescopeEntryNumber<1E6//telescopeFitter.nEvents//1000000
 			;) {
 		triggerStatusHistogram.reset();
 		// Get Entry and match trigger Numbers
@@ -279,7 +280,7 @@ void TrackCombiner::processTracks() {
 		tpcHits=setTPCErrors(tpcHits);
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes, tpcEntryNumber); continue; };
-		vector<HoughTransformer::HitCluster> tpcFittedClusters; //todo: replace with actual cluster for removing hits from cluster
+		vector<HoughTransformer::HitCluster> tpcFittedClusters;
 		for( auto& cluster : tpcClusters ) {
 			if(cluster.getNHitsUnflagged()<2) continue;
 			auto fit=regressionFit3d(cluster);
