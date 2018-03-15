@@ -173,11 +173,13 @@ BufferedTreeFiller::TreeEntry& putResidualsInEntry(
 
 std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 	for(auto& h : hits) {
+		//TODO: move these values to alignment
 		double Dy=0.09776, Dx=0.081;
 		double z0y=3.994, z0x=3.049;
+
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0y);
 		double ds=timePixChip.driftSpeed;
-		double dx0=0.1764; //1.56*1.56*ds*ds/12.+...  //1.56 is timePix3 time resolution
+		double dx0=0.1764; //1.56*1.56*ds*ds/12.+...  //1.56 ns is timePix3 time resolution
 		h.error2x=Dx*Dx*(h.x-z0x)+dx0*dx0;
 	}
 	return hits;
@@ -211,13 +213,7 @@ std::vector<PositionHit>& eraseOutsideArea(std::vector<PositionHit>& spaceHit) {
 }
 
 void TrackCombiner::processTracks() {
-	const TVector3& timepixShift=alignment.relativeAlignment.shift;
-	const TVector3& rotationCOM=alignment.relativeAlignment.getCOM();
 	ToTCorrector ToTCorrection; ToTCorrection.load("ToTCorrection.dat");
-
-	//DEBUG
-//	timepixEntryFirstMatch=0;
-//	previousTriggerNumberBegin=previousTriggerNumberEnd=0;
 
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(previousTriggerNumberBegin);
@@ -233,9 +229,9 @@ void TrackCombiner::processTracks() {
 		if( matchStatus == MatchResult::end ) break;
 		else if( matchStatus == MatchResult::noMatch) continue;
 
-		// Fit tracks
+		//Fit tracks
 
-		//telescope
+		//Telescope
 		telescopeFits.clear();
 		auto telescopeHits=telescopeFitter.getSpaceHits();
 		if( !telescopeFitter.passEvent(telescopeHits) ) { replaceStatus(1, "less than 4 planes hit in telescope", tpcEntryNumber); continue;} //minimal 4 planes!
@@ -258,9 +254,8 @@ void TrackCombiner::processTracks() {
 		}
 		if(telescopeFits.empty()) { replaceStatus(2, "All telescope clusters failed fit", tpcEntryNumber); continue; }
 
-//		cout<<"telescope passed!"<<endl;
 
-		//timepix
+		//Timepix
 		tpcFits.clear();
 		auto tpcHits=tpcFitter.getSpaceHits(); //timewalk for cross-talk insertion
 //		auto tpcHits=tpcFitter.getSpaceHitsWithCrossTalk(alignment.timeWalkCorrection); //timewalk for cross-talk insertion
@@ -270,6 +265,10 @@ void TrackCombiner::processTracks() {
 		if(correctToTByCol) tpcHits=ToTCorrection.correct(tpcHits);
 		if(correctTimewalk) tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
+
+		//Transform to telescope frame
+		const TVector3& rotationCOM=alignment.relativeAlignment.getCOM();
+		const TVector3& timepixShift=alignment.relativeAlignment.shift;
 		for(auto& h: tpcHits) {
 			h.y=-h.y;
 			h.RotatePosition(alignment.relativeAlignment.angle[1], rotationCOM, {0,1,0});
@@ -277,7 +276,7 @@ void TrackCombiner::processTracks() {
 			h.RotatePosition(alignment.relativeAlignment.angle[2], rotationCOM, {0,0,1});
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
-		tpcHits=setTPCErrors(tpcHits);
+		tpcHits=setTPCErrors(tpcHits); //set tpc Errors based on position above grid
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes, tpcEntryNumber); continue; };
 		vector<HoughTransformer::HitCluster> tpcFittedClusters;

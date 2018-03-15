@@ -40,16 +40,13 @@ TimePixFitter::TimePixFitter(std::string inputfile, const DetectorConfiguration&
 	hitTable->SetBranchAddress("triggerNumber", &triggerNumber);
 	hitTable->SetBranchAddress("trigger", &timestamp);
 	nEvents=hitTable->GetEntriesFast();
-	//    unsigned short triggerNumberBegin, triggerNumberEnd;
-//	hitTable->SetBranchAddress("triggerNumberBegin", &triggerNumberBegin);
-//	hitTable->SetBranchAddress("triggerNumberEnd", &triggerNumberEnd);
 
 }
 
 TimePixFitter::~TimePixFitter() {
-	file->Close();
-	residualHistograms=nullptr; //make sure to close residualHistograms before track, because they use the same file
-	trackHistograms=nullptr; //todo: combine both in a proper way;
+	file->Close(); //close and write contents of file
+	residualHistograms=nullptr; //make sure to delete residualHistograms before trackHistograms, because they use the same file
+	trackHistograms=nullptr; //todo: make this independent of order
 }
 
 int TimePixFitter::makeMask(double ntimesThreshold) {
@@ -96,7 +93,7 @@ std::vector<PositionHit> TimePixFitter::getSpaceHits() {
 	if (!mask.empty()) {
 		auto maskedHit = applyPixelMask(mask, *rawHits);
 		//convert rawHits to positions
-		const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/;
+		const double driftScale=25./4096 /*scale*/ * 0.075 /*mm/ns*/; //Todo: move parameters to detectorConfiguration
 		spaceHit=convertHits( maskedHit, detector.pixelsize, detector.pixelsize, driftScale );
 	}
 	return spaceHit;
@@ -145,6 +142,7 @@ void TimePixFitter::drawEvent(const vector<PositionHit>& spaceHit,
 
 void TimePixFitter::fitTracks(std::string outputfilename) {
 
+	//open histograms
 	residualHistograms=unique_ptr<ResidualHistogrammer>(new ResidualHistogrammer(outputfilename, detector));
 	if(makeTrackHistograms) trackHistograms=unique_ptr<TrackHistogrammer>(new TrackHistogrammer(detector) );
 
@@ -168,20 +166,24 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 		//apply mask and convert
 		vector<PositionHit> spaceHit = getSpaceHits();
 
+		//optionally do ToT and timewalk corrections here
+		//if no ToT correction, it is best to take slightly larger ybins
+		houghTransform.xbins=6;
+
+		//optionally set hit errors here, default is all weights equal. See TrackCombiner for example on how to set weights
+
 		//check event
 		if( !passEvent(spaceHit) ) continue;
 		++nPassed;
 
-		//sum x and y here to sum all rawHits including noise
+		//put sum x and y here to sum all rawHits including noise
 
-		//apply translation and rotation
-		spaceHit=rotateAndShift(spaceHit);
+		//apply translation
+		spaceHit=rotateAndShift(spaceHit); //just a shift in spite of name
 		//hough transform
 		auto houghClusters = houghTransform(spaceHit);
 
-		//require at least nmin planes to be hit
-		//todo:implement some minimum spread here
-//		houghClusters.remove_if([](const HoughTransformer::HitCluster& hc){return false; });
+		//continue if no clusters are found
 		if(!houghClusters.size()) {
 			continue;
 		}
@@ -190,7 +192,7 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 		std::vector<FitResult3D> fits;
 		for(auto& hitCluster : houghClusters) {
 
-			if(hitCluster.size()<2) continue;
+			if(hitCluster.size()<2) continue; //need at least 2 points for a fit
 
 			//fit track
 			auto fit=regressionFit3d(hitCluster);
@@ -202,14 +204,14 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 
 			//refit on planes with selection
 			HoughTransformer::HitCluster selectedHits;
-			std::copy_if(hitCluster.begin(), hitCluster.end(), std::back_inserter(selectedHits), selectHitForRefit );
+			std::copy_if(hitCluster.begin(), hitCluster.end(), std::back_inserter(selectedHits), selectHitForRefit ); //default: select (copy) all hits
 			if(selectedHits.size()<2) continue;
-			if(constructLineParallelToZ) fit = makeLinesParallelToZ( selectedHits.front().x, selectedHits.front().y );
-			else fit=regressionFit3d(selectedHits);
+			if(constructLineParallelToZ) fit = makeLinesParallelToZ( selectedHits.front().x, selectedHits.front().y ); //for allignment purposes
+			else fit=regressionFit3d(selectedHits); //refit
 
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 
-			//sum x and y for calculation of centre of mass from track rawHits
+			//sum x and y for calculation of centre of mass from track rawHits, also for alignment
 			if(hitCluster.size()) for(auto& h : hitCluster) {
 				hitsXSum+=h.x;
 				hitsYSum+=h.y;
@@ -218,7 +220,7 @@ void TimePixFitter::fitTracks(std::string outputfilename) {
 
 			residuals=calculateResiduals(hitCluster, fit);
 
-			residualHistograms->fill(residuals, hitsCentre);
+			residualHistograms->fill(residuals, hitsCentre); //fill residuals, hit centre for rotations
 
 			//sum residuals
 			if(residuals.size()) for(auto& r : residuals) {

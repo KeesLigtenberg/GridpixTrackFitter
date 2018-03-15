@@ -53,9 +53,9 @@ inline std::vector<PositionHit> convertHits(const std::vector<Hit>& hv, double p
 		return phv;
 }
 
-template< class container=std::vector<PositionHit> >
-container convertHits(const std::vector<TimePixHit>& hv, double pixelwidth, double pixelheight, double driftSpeed, int plane=0 ) {
-		container phv;
+template< class Container=std::vector<PositionHit> >
+Container convertHits(const std::vector<TimePixHit>& hv, double pixelwidth, double pixelheight, double driftSpeed, int plane=0 ) {
+		Container phv;
 		for(auto& h : hv) {
 			// .5 to center position in pixel
 			int plane=0;

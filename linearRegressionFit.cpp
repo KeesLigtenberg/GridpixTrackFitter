@@ -62,13 +62,6 @@ FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double int
 		sumW+=1/errorx2;
     }
 
-    // z <-> y from LinearTrackRegression::doRegressionX of marlinTPC
-    /** gives back parameters for \n
-     *  x = slope1 * z + intersept1\n
-     *  y = slope2 * z + intersept2\n
-     *
-     */
-
     double denominator=(sumZ * sumZ - sumW * sumZsquare);
     if(std::fabs(denominator)<1E-20){
     	std::cerr<<"error: (sumZ * sumZ - ntot * sumZsquare)<1E-20"<<std::endl;
@@ -106,13 +99,6 @@ FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double int
 		sumZsquare += hiz*hiz/errory2;
 		sumW+=1/errory2;
     }
-
-    // z <-> y from LinearTrackRegression::doRegressionX of marlinTPC
-    /** gives back parameters for \n
-     *  x = slope1 * z + intersept1\n
-     *  y = slope2 * z + intersept2\n
-     *
-     */
 
     double denominator=(sumZ * sumZ - sumW * sumZsquare);
     if(std::fabs(denominator)<1E-20){

@@ -30,7 +30,7 @@ struct HoughTransformer {
 
 	virtual ~HoughTransformer() {};
 
-	struct HitCluster : std::list<PositionHit> { //todo: make member variable instead of inheritance
+	struct HitCluster : std::list<PositionHit> { //todo: make member variable instead of inheritance (bad practice inheriting from stl classes)
 		int clusterSize=0, planeHit[nPlanes] = {} ;
 		void add( const PositionHit& h ) {
 			push_back(h);
@@ -105,6 +105,7 @@ struct HoughTransformer {
 	}
 
 	//telescope
+	//vector of vectors, this means multiple planes
 	virtual std::list<HitCluster> operator() ( const std::vector< std::vector<PositionHit> >& hv  ) {
 
 		//construct grid
@@ -188,12 +189,14 @@ struct HoughTransformer {
 	
 
 	//timepix
+	//just a vector, this is one plane
 	std::list<HoughTransformer::HitCluster> operator() ( const std::vector<PositionHit>& hv ) {
 
 		//construct grid
 		std::vector< std::vector< std::unique_ptr<HitCluster> > > houghGrid( xbins ); //Houghgrid[z][y]
 		for(auto& v : houghGrid) v.resize(ybins);
 
+		//set drawhistogram to true to make a histogram of the hough-like transform.
 		constexpr bool DrawHistogram=false;
 		static TCanvas* canv=nullptr;
 		if(canv) canv->Clear();
@@ -226,33 +229,40 @@ struct HoughTransformer {
 			canv->SetTicks(1,1);
 			gPad->Update();
 			if(c=='w') {gPad->Print("timepixCluster.pdf");}
-			if(c=='q') { throw graphicHistogram;} //abuse of throw mechanism
+			if(c=='q') { throw 1;} //abuse of throw mechanism
 		}
 
-		//get grid positions and sort by size
-		std::list< std::tuple<int, int, int> > gridPositions;
+
+		struct ClusterCandidate {
+			int size, x, y;
+			ClusterCandidate(int size, int x, int y) : size(size),x(x),y(y) {};
+		};
+
+		//get grid positions
+		std::list< ClusterCandidate > ClusterCandidatePositions;
 		for(int i=0; i<xbins; i++) {
 			for(int j=0; j<ybins; j++) {
 				if(houghGrid.at(i).at(j)) {
 					int size=houghGrid.at(i).at(j)->clusterSize;
 					if(size >= minCandidateSize) {
-						gridPositions.emplace_back(size, i, j);
+						ClusterCandidatePositions.emplace_back(size, i, j);
 					}
 				}
 			}
 		}
-		gridPositions.sort();
+		//sort by size
+		ClusterCandidatePositions.sort([](const ClusterCandidate& a, const ClusterCandidate& b) {return a.size>b.size;});
 
 		//merge neighbouring bins, starting with largest
 		std::list<HitCluster> foundClusters;
-		for(auto it=gridPositions.rbegin();	it!=gridPositions.rend(); it++) {
-			int size, i, j;
-			std::tie(size,i,j)=*it;
+		for(auto it=ClusterCandidatePositions.rbegin();	it!=ClusterCandidatePositions.rend(); it++) {
+			int i=it->x, j=it->y;
 
 			if(!houghGrid.at(i).at(j)) continue;
 			auto& currentCluster= *houghGrid.at(i).at(j);
-			if(!currentCluster.clusterSize) continue;
+			if(!currentCluster.clusterSize) continue; //already merged with another
 
+			//merge with neighbours
 			for(int dx=-1; dx<=1; dx++) for(int dy=-1; dy<=1; dy++) {
 				if(i+dx<0 or i+dx >= xbins or j+dy<0 or j+dy >= ybins or (!dx and !dy) ) continue; //outside grid
 				if(! houghGrid.at(i+dx).at(j+dy) ) continue; //no hits in bin
@@ -365,27 +375,12 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 	legend->AddEntry(axisObject, "Timepix hits", "p");
 	axisObject->SetLineColor(kOrange+7);
 	axisObject->SetLineWidth(2);
-	legend->AddEntry(axisObject, "Telescope track", "l");
+	legend->AddEntry(axisObject, "Track fit", "l");
 	legend->Draw();
 
 	gPad->Update();
 
 }
-
-//timepix HoughTransform
-
-struct TimePixHoughTransformer {
-
-	using HitCluster=HoughTransformer::HitCluster;
-
-	double xmin,xmax, ymax;
-	int xbins, ybins;
-
-
-
-
-
-};
 
 
 #endif

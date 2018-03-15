@@ -31,9 +31,7 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 	} else {
 		TrackCombiner combiner(mimosaInput, timepixInput);
 		combiner.loadAlignment("alignment.dat");
-		combiner.openFile(displayEvent ? "tmp.root" : "fitResults.root");
-	//	combiner.openFile(displayEvent ? "tmp.root" : "fitResultsSplit.root");
-	//	combiner.doSplitForResiduals=!displayEvent;
+		combiner.openFile(displayEvent ? "tmp.root" : "fitResults.root"); //do not overwrite results if only dipslaying
 		combiner.setDisplayEvent(displayEvent);
 		combiner.processTracks();
 	}

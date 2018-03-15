@@ -341,6 +341,9 @@ void trackFitter::saveAlignment(std::string file) {
 }
 
 bool trackFitter::processDrawSignals() {
+	static bool printed=false;
+	if(not printed) { cout<<"<return> to continue, 'q' to break\n"; printed=true; };
+
 	auto signal = std::cin.get();
 	if (signal == 'q')
 		return true;

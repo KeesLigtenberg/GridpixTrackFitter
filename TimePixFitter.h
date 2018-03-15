@@ -20,6 +20,7 @@
 #include "linearRegressionFit.h"
 #include "Alignment.h"
 
+//forward declaration
 class ResidualHistogrammer;
 class TrackHistogrammer;
 
@@ -31,7 +32,7 @@ public:
 	int makeMask(double ntimesThreshold=1e4);
 	void fitTracks( std::string outputfilename );
 
-	std::pair<double,double> getMeans(); //not constant because adds fits!
+	std::pair<double,double> getMeans(); //not a constant function because adds fits!
 	const std::pair<double,double>& getShift() const;
 	double getRotation(); //not constant because adds fits!
 //	const double& getAngle() const;
@@ -45,12 +46,13 @@ public:
 	void drawEvent(const std::vector<PositionHit>& spaceHit,
 			const std::vector<FitResult3D>& fits);
 
+	//process controls:
 	bool displayEvent=false;
-	bool makeTrackHistograms=false;
+	bool makeTrackHistograms=true;
 	bool recalculateCOM=true; //centre of mass
 	bool constructLineParallelToZ=false;
 
-	double maxResidual=10;
+	double maxResidual=1;
 
 	std::function<bool(const PositionHit&)> selectHitForRefit = [](const PositionHit&){return true;}; //select all rawHits by default
 

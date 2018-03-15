@@ -35,13 +35,14 @@ void FitTracksTimePix(std::string inputfile) {
 	//get tree from file
 	TimePixFitter tpcFitter(inputfile,timePixChip);
 
-	tpcFitter.makeMask(1e3);
+	tpcFitter.makeMask(); //mask noisy pixels
 
-	tpcFitter.setSlopes( {0.006,-0.154} );
+	//configure bin algorithm. Slope is needed to
+	tpcFitter.setSlopes( {0.006,-0.26} );
 	tpcFitter.houghTransform.minCandidateSize=6;
 	tpcFitter.houghTransform.minClusterSize=10;
 
-	tpcFitter.displayEvent=false;
+	tpcFitter.displayEvent=true;
 
 	tpcFitter.fitTracks("timepixHistograms.root");
 

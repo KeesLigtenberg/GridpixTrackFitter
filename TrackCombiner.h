@@ -35,6 +35,7 @@
 
 #include "testBeamSetup.h"
 
+//helper class to fill tree buffered.
 class BufferedTreeFiller {
 public:
 	BufferedTreeFiller() { setTreeBranches(); };
@@ -43,7 +44,7 @@ public:
 		vector<FitResult3D> telescopeFits{};
 		vector<FitResult3D> tpcFits{};
 		vector< vector<HitEntry> > tpcResiduals{};
-		vector<int> tpcClusterSize{}; //because tpcResidualsl[i].size() is not easily accessible
+		vector<int> tpcClusterSize{}; //additional information because tpcResidualsl[i].size() is not easily accessible
 		int ntpcHits=0, ntelescopeHits=0;
 		double dxz=0., dyz=0.;
 		int nfitted=0, nresiduals=0;
@@ -139,7 +140,9 @@ private:
 		void Write() { statusHistogram->LabelsDeflate(); statusHistogram->Write(); };
 		std::shared_ptr<TH1D> statusHistogram;
 	} frameStatusHistogram{"frame"}, triggerStatusHistogram{"trigger"}, timepixStatusHistogram{"timepixTrigger"};
-	EntryBuffer<int, StatusKeeper> timepixStatusKeepers;
+	EntryBuffer<int, StatusKeeper> timepixStatusKeepers; //special buffered statusKeeper function
+
+	//one function to fill all statushistograms at once.
 	void replaceStatus(int priority, std::string message, int tpcEntryNumber) {
 		for(auto* s : {&frameStatusHistogram, &triggerStatusHistogram} ) s->replace(priority, message);
 		if(!timepixStatusKeepers.isInBuffer(tpcEntryNumber)) {

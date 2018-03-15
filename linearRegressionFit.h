@@ -26,7 +26,7 @@ struct FitResult2D {
 	FitResult2D() : slope(0), intercept(0), error({0,0,0}), interceptz(0) {}
 
 	double slope, intercept;
-	std::vector<double> error; //dslope^2, dslopeintercept, dintercept^2 todo: replace with std::array<3>, when root supports this
+	std::vector<double> error; //dslope^2, dslopeintercept, dintercept^2 todo: replace with std::array<3>, when root starts to supports this
 	double interceptz;
 
 	double at(double z) const { return intercept+slope*(z+interceptz); } //check math
@@ -47,15 +47,14 @@ struct FitResult3D {
 	FitResult3D() : XZ(), YZ() {};
 	FitResult3D(FitResult2D XZ, FitResult2D YZ) : XZ(XZ), YZ(YZ) {};
 
-	FitResult2D XZ, YZ;
-
 	void draw(double zmin, double zmax) const;
 	bool isValid() const { return XZ.isValid() and YZ.isValid(); }
 	double xAt(double z) const { return XZ.at(z); };
 	double yAt(double z) const { return YZ.at(z); };
 	double getTrackLength(double z1, double z2) { return sqrt( pow(xAt(z2)-xAt(z1),2) + pow(yAt(z2)-yAt(z1),2) + pow(z2-z1,2) ); }
 
-	double trackLength=0; //temporary!
+	FitResult2D XZ, YZ;
+	double trackLength=0; //temporary! for saving tracklength in tree (depends on detector configuration, which is not in tree)
 
 	FitResult3D makeShifted( const TVector3& shift ) const {
 		return { XZ.makeShifted(shift.x(), shift.z()), YZ.makeShifted(shift.y(), shift.z())	};
@@ -65,7 +64,7 @@ struct FitResult3D {
 	}
 	FitResult3D makeRotated(double rotation, const TVector3& rotationPoint, const TVector3& rotationAxis ) const;
 
-	ClassDef(FitResult3D, 1);
+	ClassDef(FitResult3D, 1); //root stuff
 };
 
 
