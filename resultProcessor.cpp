@@ -119,8 +119,8 @@ void resultProcessor::Show(Long64_t entry)
 namespace {
 	double getFractionInTrack( const std::vector<HitEntry>& hv ) {
 		int total=hv.size();
-		int inTrack=std::count_if(hv.begin(), hv.end(), [](HitEntry& h) {
-			return fabs(h.ry)<25*0.55;
+		int inTrack=std::count_if(hv.begin(), hv.end(), [](const HitEntry& h) {
+			return fabs(h.ry)<25*0.055;
 		});
 		return double(inTrack)/total;
 	}
@@ -231,6 +231,7 @@ namespace {
 	}
 
 	bool isZero(double x,double threshold=1E-30) { return fabs(x)<threshold; }
+
 	struct crosstalkCalculator {
 		  std::array<std::array<double, 256>, 256> ToTmap{{}};
 		  std::array<std::array<char, 256>, 256> flagmap{{}};
@@ -356,7 +357,7 @@ void resultProcessor::Loop()
 
    TH2D hitmap("hitmap", "map of hits in tracks", 256,0,256,256,0,256 );
    TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
-   const int nbins=256;
+   const int nbins=64;//256;
    TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsxExp("deformationsxExp", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
@@ -381,10 +382,13 @@ void resultProcessor::Loop()
    TH1D pairToTMaxControl("pairToTMaxControl","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
    TH1D pairZDiffControl("pairZDiffControl", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 30,0,3.515625);
 
-   std::vector<int> hitsAlongTrack(512);
    std::deque<int> aggravatedHits;
+   std::vector<int> hitsAlongTrack(512);
    TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
    binnedHitsTree.Branch("hits", &hitsAlongTrack );
+   std::vector<int> hitsAlongTrackMoreSigma(512);
+   TTree binnedHitsTreeMoreSigma("binnedHitsTreeMoreSigma", "tree with hits per track");
+   binnedHitsTreeMoreSigma.Branch("hits", &hitsAlongTrackMoreSigma );
 
    TH1* hitHist=getHistFromTree(fChain,"timepixClusterSize", "", "nhitsHist(200,0,400)");
    TH1D hitInAreaHist("nhitsInArea", "Number of hits inside area per event", 200,0,400);
@@ -407,6 +411,7 @@ void resultProcessor::Loop()
        trackLength.Fill(timepixFrameFits.at(0).getTrackLength( timePixChip.zmin(), timePixChip.zmax() ));
 
  	  std::fill(hitsAlongTrack.begin(), hitsAlongTrack.end(), 0);
+ 	  std::fill(hitsAlongTrackMoreSigma.begin(), hitsAlongTrackMoreSigma.end(), 0);
  	  crosstalkCalculator crosstalk, crosstalkZ;
 
  	 int nHitsInsideArea=0;
@@ -420,6 +425,11 @@ void resultProcessor::Loop()
         	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
     		  timewalk.Fill(h.ToT*0.025,h.rx+dxTW);
     		  timewalkCorrected.Fill(h.ToT*0.025,h.rx);
+    	  }
+
+    	  //write number of hits bewteen 4.5 and 3 sigma
+    	  if(h.rx*h.rx < 4.5*4.5*h.e2x and h.ry*h.ry < 3*3*h.e2y and h.flag >= -2) {
+    		  ++hitsAlongTrackMoreSigma[2*(h.col-h.rz/.055)];
     	  }
 
     	  if(h.ToT*0.025<0.15 || fabs(h.rx)>2 ) continue;
@@ -469,9 +479,10 @@ void resultProcessor::Loop()
       hitInAreaHist.Fill(nHitsInsideArea);
 
       //sum hits for dEdx: fill corresponding tree and make histograms
-      constexpr bool dodEdX=false;
+      constexpr bool dodEdX=true;
       if(dodEdX){
           binnedHitsTree.Fill();
+          binnedHitsTreeMoreSigma.Fill();
     	  //view bins
 //    	  TH1D hitsAlongTrackHist("hitsAlongTrackHist", "hits along track", hitsAlongTrack.size(), 0, hitsAlongTrack.size() );
 //    	  std::vector<double> asDouble(hitsAlongTrack.begin(), hitsAlongTrack.end());
@@ -534,7 +545,7 @@ void resultProcessor::Loop()
    std::vector<double> minmaxVector={0.1,0.2,0.1,0.2};
    auto error=errorVector.begin(), minmax=minmaxVector.begin();
    for(auto d : {&deformationsy, &deformationsx, &deformationsyExp, &deformationsxExp} ) {
-	   d=removeBinsWithFewerEntries(d, 1000);
+	   d=removeBinsWithFewerEntries(d, 100);
 	   getFrequencyHistogram(d, *error++);
 	   double max=*minmax++;
 	   setMinMax(d,-max,max);

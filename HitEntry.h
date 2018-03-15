@@ -19,6 +19,8 @@ struct HitEntry {
 		x(r.h.x),
 		y(r.h.y),
 		z(r.h.z),
+		e2x(r.h.error2x),
+		e2y(r.h.error2y),
 		ToT(r.h.ToT),
 		row(r.h.row),
 		col(r.h.column),
@@ -26,6 +28,7 @@ struct HitEntry {
 	{};
 	double rx, ry, rz; //residuals in timepix frame
 	double x, y, z; //position in telescope frame
+	double e2x, e2y;//errors in telescope frame
 	int ToT; //ToT in [0.025 ns]
 	int row, col; //row col of hit
 	int flag;
