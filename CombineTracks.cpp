@@ -17,7 +17,7 @@ void CombineTracks(std::string mimosaInput, std::string timepixInput, bool displ
 
 	bool doAlignment=false;
 	if(!displayEvent and doAlignment) {
-		for(int i=0; i<1; ++i) {
+		for(int i=0; i<3; ++i) {
 			TrackCombiner combiner(mimosaInput, timepixInput);
 			cout<<"loading alignment\n";
 			combiner.loadAlignment("alignment.dat");

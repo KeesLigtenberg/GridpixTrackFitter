@@ -363,7 +363,7 @@ void resultProcessor::Loop()
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,40,-2,2);
-   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,40,-2,2);
+   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,200,-2,2);
 
    TH2D timewalk("timewalk", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
    TH2D timewalkCorrected("timewalkCorrected", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
@@ -479,7 +479,7 @@ void resultProcessor::Loop()
       hitInAreaHist.Fill(nHitsInsideArea);
 
       //sum hits for dEdx: fill corresponding tree and make histograms
-      constexpr bool dodEdX=true;
+      constexpr bool dodEdX=false;
       if(dodEdX){
           binnedHitsTree.Fill();
           binnedHitsTreeMoreSigma.Fill();

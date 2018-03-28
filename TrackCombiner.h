@@ -127,7 +127,7 @@ private:
 	struct StatusKeeper{
 		StatusKeeper(std::string name) : statusHistogram( new TH1D( (name+"Status").c_str(), ("status of "+name).c_str(), 1,0,1) ) {};
 		StatusKeeper(std::shared_ptr<TH1D> h) : statusHistogram(h) {};
-		StatusKeeper(const TrackCombiner::StatusKeeper&) = default;
+		StatusKeeper(const TrackCombiner::StatusKeeper& o) : statusHistogram(o.statusHistogram) {};
 		virtual ~StatusKeeper() {};
 		int priority=0; std::string message="";
 		void replace(int messagePriority, std::string newMessage) {

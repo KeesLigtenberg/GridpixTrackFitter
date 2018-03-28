@@ -284,8 +284,9 @@ void RelativeAligner::calculate(TTree* tree) {
 		std::cout<<"added "<<axis<<" rotation is "<<std::atan(mean)<<"\n";
 	}
 	//Z axis rotation
-	auto comx=std::to_string(timepixCOM.x()), comy=std::to_string(timepixCOM.y());
-	std::string avgx="Sum$(timepixHits.x)/Length$(timepixHits)", avgy="Sum$(timepixHits.y)/Length$(timepixHits)";
+	auto comx=std::to_string(timepixCOM.x()), comy=std::to_string(timepixCOM.y()), comz=std::to_string(timepixCOM.z());
+	std::string avgx="timepixFits.XZ.intercept+timepixFits.XZ.slope*"+comz, avgy="timepixFits.YZ.intercept+timepixFits.YZ.slope*"+comz;
+//	std::string avgx="Sum$(timepixHits.x)/Length$(timepixHits)", avgy="Sum$(timepixHits.y)/Length$(timepixHits)";
 	auto zRotation=getHistFromTree(tree,
 			"(-dyz*("+avgx+"-"+comx+")+dxz*("+avgy+"-"+comy+"))"
 			"/(pow("+avgx+"-"+comx+", 2)+pow("+avgy+"-"+comy+",2))",
@@ -296,8 +297,8 @@ void RelativeAligner::calculate(TTree* tree) {
 			"/(pow("+avgx+"-"+comx+", 2)+pow("+avgy+"-"+comy+",2))"
 			"))<1 && "+eventcuts
 			, "zRotHist(100,-1,1)", "goff");
-//	std::cout<<"got histogram zrotation\n";
-//	zRotation->Draw(); gPad->Update(); std::cin.get();
+	std::cout<<"got histogram zrotation\n";
+	zRotation->Draw(); gPad->Update(); std::cin.get();
 	double zAngle=getMeanFromGausFit(*zRotation);
 	angle[2]-=zAngle;
 	std::cout<<"added zrotation is "<<zAngle<<"\n";

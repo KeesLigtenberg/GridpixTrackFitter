@@ -164,9 +164,10 @@ BufferedTreeFiller::TreeEntry& putResidualsInEntry(
 	}
 	treeEntry.tpcResiduals.emplace_back( residuals.begin(), residuals.end() );//construct new vector with entries just for this cluster in tpcResiduals
 
-	TVector3 average=cluster.getAveragePosition();
-	treeEntry.dyz=(average.z()*fit.YZ.slope+fit.YZ.intercept-average.y())/sqrt(1+fit.YZ.slope*fit.YZ.slope);
-	treeEntry.dxz=(average.z()*fit.XZ.slope+fit.XZ.intercept-average.x())/sqrt(1+fit.XZ.slope*fit.XZ.slope);
+	TVector3 average=cluster.getAveragePosition(true);
+	treeEntry.dyz=(fit.YZ.at(average.z())-average.y())/sqrt(1+fit.YZ.slope*fit.YZ.slope);
+	treeEntry.dxz=(fit.XZ.at(average.z())-average.x())/sqrt(1+fit.XZ.slope*fit.XZ.slope);
+	//todo:move alignment of z-axis here
 
 	return treeEntry;
 }
@@ -174,8 +175,8 @@ BufferedTreeFiller::TreeEntry& putResidualsInEntry(
 std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 	for(auto& h : hits) {
 		//TODO: move these values to alignment
-		double Dy=0.09776, Dx=0.081;
-		double z0y=3.994, z0x=3.049;
+		double Dy=0.308/sqrt(10), Dx=0.253/sqrt(10);
+		double z0y=3.816, z0x=z0y;
 
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0y);
 		double ds=timePixChip.driftSpeed;
@@ -218,7 +219,7 @@ void TrackCombiner::processTracks() {
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(previousTriggerNumberBegin);
 	for(int telescopeEntryNumber=0,tpcEntryNumber=0; //5000000, 2308829
-			telescopeEntryNumber<1E6//telescopeFitter.nEvents//1000000
+			telescopeEntryNumber<1E5//telescopeFitter.nEvents//1000000
 			;) {
 		triggerStatusHistogram.reset();
 		// Get Entry and match trigger Numbers
@@ -302,17 +303,6 @@ void TrackCombiner::processTracks() {
 
 //		cout<<"timepix passed!"<<endl;
 
-		//display event
-		if( displayEvent ) { //and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
-			drawEvent(tpcHits, telescopeFits);
-//			drawEvent(tpcFittedClusters.front(), tpcFits);
-//			{	HoughTransformer::drawCluster(tpcHits, combinedSetupForDrawing);
-//				for (auto& f : telescopeFits)
-//					f.draw(combinedSetupForDrawing.zmin(), combinedSetupForDrawing.zmax());
-//				gPad->Update(); }
-			if( telescopeFitter.processDrawSignals()  ) break;
-		}
-
 		//set trackLength entry
 		//temporary: should be done using function!
 		{
@@ -391,7 +381,7 @@ void TrackCombiner::processTracks() {
 					combinedFits.push_back(combinedFit);
 
 					if(doSplitForResiduals) {
-						treeEntry=putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);
+						treeEntry=putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);// combinedFit
 					} else {
 						treeEntry=putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcPlusOneFit, alignment);
 					}
@@ -439,10 +429,22 @@ void TrackCombiner::processTracks() {
 //		cout<<"Success!\n";
 		replaceStatus(20, "Successful", tpcEntryNumber);
 
+		//add to list of matches
 		tpcEntryHasMatchingFit.push_back(tpcEntryNumber);
 		//cleanup old entry info
 		while(not tpcEntryHasMatchingFit.empty() and tpcEntryHasMatchingFit.front()<tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin) ) tpcEntryHasMatchingFit.pop_front();
 
+		//display event
+		if( displayEvent ) { //and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
+//			drawEvent(tpcHits, telescopeFits);
+//			drawEvent(tpcFittedClusters.front(), tpcFits);
+			drawEvent(tpcFittedClusters.front(), combinedFits);
+//			{	HoughTransformer::drawCluster(tpcHits, combinedSetupForDrawing);
+//				for (auto& f : telescopeFits)
+//					f.draw(combinedSetupForDrawing.zmin(), combinedSetupForDrawing.zmax());
+//				gPad->Update(); }
+			if( telescopeFitter.processDrawSignals()  ) break;
+		}
 
 		for(unsigned iClust=0; iClust<tpcFittedClusters.size(); ++iClust) {
 			if(tpcFitIsMatched[iClust])	treeEntry.tpcClusterSize.push_back( tpcFittedClusters[iClust].getNHitsUnflagged() );//count cluster size of only fitted clusters

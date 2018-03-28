@@ -65,12 +65,15 @@ struct HoughTransformer {
 			}
 			return getNPlanesHit();
 		}
-		TVector3 getAveragePosition() const {
+		TVector3 getAveragePosition(bool rejectFlagged=false) const {
 			TVector3 sum(0,0,0);
+			int n=0;
 			for(const auto& hit : *this) {
+				if(rejectFlagged && hit.flag<0) continue;
 				sum+=hit.getPosition();
+				n++;
 			}
-			sum*=(1./this->size());
+			sum*=(1./n);
 			return sum;
 		}
 		int getNHitsUnflagged() {
