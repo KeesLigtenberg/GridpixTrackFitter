@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <TH2.h>
+#include "TH3.h"
 #include <TStyle.h>
 #include <TCanvas.h>
 #include "TProfile2D.h"
@@ -357,13 +358,16 @@ void resultProcessor::Loop()
 
    TH2D hitmap("hitmap", "map of hits in tracks", 256,0,256,256,0,256 );
    TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
-   const int nbins=64;//256;
+   const int nbins=256;//64;
    TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsxExp("deformationsxExp", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,40,-2,2);
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,200,-2,2);
+   TProfile rxByToA("rxByToA", "z-residuals by time of arival; Time of arival [ns]; z-residual [mm]", 500, 50, 300);
+
+   TH3D diffusionxToT("diffusionxToT", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm];ToT [#mus]", 50,4,24,40,-2,2,3,0,0.9);
 
    TH2D timewalk("timewalk", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
    TH2D timewalkCorrected("timewalkCorrected", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
@@ -422,7 +426,6 @@ void resultProcessor::Loop()
     	  if(h.ToT*0.025>0.15) crosstalkZ.Fill(h.col,h.row,h.x+dxTW);
 
     	  if(h.flag==-3 or h.flag>=-1) {
-        	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
     		  timewalk.Fill(h.ToT*0.025,h.rx+dxTW);
     		  timewalkCorrected.Fill(h.ToT*0.025,h.rx);
     	  }
@@ -437,6 +440,8 @@ void resultProcessor::Loop()
     	  double hryp=-h.ry/cos(timepixFits->front().YZ.slope);
     	  diffusiony.Fill(h.x-h.rx, hryp);
     	  diffusionx.Fill(h.x-h.rx, h.rx);
+    	  diffusionxToT.Fill(h.x-h.rx, h.rx, h.ToT*0.025);
+    	  rxByToA.Fill( (h.x-dxTW)/0.075, h.rx );
 
     	  hitmap.Fill( h.col, h.row );
 
@@ -445,12 +450,10 @@ void resultProcessor::Loop()
     	  //have a chance to drop hits
     	  if(dropHits and gRandom->Rndm() > targetNumberOfHits/actualNumberOfHits) continue;
 
-
-    	  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
-    	  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, hryp ); //todo: check where XZ slope enters
-    	  deformationsx.Fill( h.col, h.row, h.rx );
-    	  deformationsy.Fill( h.col, h.row, hryp ); //todo: check where XZ slope enters
-
+		  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
+		  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, hryp ); //todo: check where XZ slope enters
+		  deformationsx.Fill( h.col, h.row, h.rx );
+		  deformationsy.Fill( h.col, h.row, hryp ); //todo: check where XZ slope enters
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
 
