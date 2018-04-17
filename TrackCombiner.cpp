@@ -213,6 +213,15 @@ std::vector<PositionHit>& eraseOutsideArea(std::vector<PositionHit>& spaceHit) {
 	return spaceHit;
 }
 
+HoughTransformer::HitCluster& flagHitsInColumn(
+		HoughTransformer::HitCluster& cluster) {
+	for(auto& h : cluster) {
+		if((h.column+1)%2) h.flag=-10;
+	}
+	return cluster;
+}
+
+
 void TrackCombiner::processTracks() {
 	ToTCorrector ToTCorrection; ToTCorrection.load("ToTCorrection.dat");
 
@@ -290,6 +299,7 @@ void TrackCombiner::processTracks() {
 			cluster=cutOnResidualPulls(cluster, residuals, 3, 2);
 //			cluster=cutOnResidualPulls(cluster, residuals, 5, 5);
 //			cout<<" - "<<cluster.size()<<"\n";
+//			cluster=flagHitsInColumn(cluster);
 			if(cluster.getNHitsUnflagged()<2) continue;
 			fit=regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
@@ -353,19 +363,6 @@ void TrackCombiner::processTracks() {
 					};
 					telescopeTPCLines.push_back(telescopeTPCLine);
 
-					//make alternative fit using an extra point in telescope
-					auto splitTpcCluster=splitCluster(tpcFittedClusters.at(iFit), [](const PositionHit& h) {
-//						return h.column<128;
-						return (h.column+h.row)%2;
-					});
-//					cout<<splittedTpcCluster.first.size()<<" - "<<splittedTpcCluster.second.size()<<"\n";
-					treeEntry.nfitted=splitTpcCluster.first.size();
-					treeEntry.nresiduals=splitTpcCluster.second.size();
-					if(splitTpcCluster.first.getNHitsUnflagged()<2 or splitTpcCluster.second.getNHitsUnflagged()<2) {
-						cout<<"split cluster has no hits!\n";
-						continue;
-					}
-
 					//get extra point from telescope
 					PositionHit lastPlaneCrossing( telescopeFit.xAt(0), telescopeFit.yAt(0), 0 );
 					lastPlaneCrossing.error2x=lastPlaneCrossing.error2y=1E-4;//=0.01mm
@@ -376,11 +373,24 @@ void TrackCombiner::processTracks() {
 					auto tpcPlusOneFit=regressionFit3d(tpcPlusOneCluster);
 					tpcPlusOneFits.push_back(tpcPlusOneFit);
 
-					splitTpcCluster.first.add( lastPlaneCrossing );
-					auto combinedFit=regressionFit3d(splitTpcCluster.first);
-					combinedFits.push_back(combinedFit);
-
 					if(doSplitForResiduals) {
+						//make alternative fit using an extra point in telescope
+						auto splitTpcCluster=splitCluster(tpcFittedClusters.at(iFit), [](const PositionHit& h) {
+	//						return h.column<128;
+							return (h.column+h.row)%2;
+						});
+	//					cout<<splittedTpcCluster.first.size()<<" - "<<splittedTpcCluster.second.size()<<"\n";
+						treeEntry.nfitted=splitTpcCluster.first.size();
+						treeEntry.nresiduals=splitTpcCluster.second.size();
+						if(splitTpcCluster.first.getNHitsUnflagged()<2 or splitTpcCluster.second.getNHitsUnflagged()<2) {
+							cout<<"split cluster has no hits!\n";
+							continue;
+						}
+
+						splitTpcCluster.first.add( lastPlaneCrossing );
+						auto combinedFit=regressionFit3d(splitTpcCluster.first);
+						combinedFits.push_back(combinedFit);
+
 						treeEntry=putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);// combinedFit
 					} else {
 						treeEntry=putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcPlusOneFit, alignment);
