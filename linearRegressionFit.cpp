@@ -64,7 +64,7 @@ FitResult2D regressionXZ(const HoughTransformer::HitCluster& cluster, double int
 
     double denominator=(sumZ * sumZ - sumW * sumZsquare);
     if(std::fabs(denominator)<1E-20){
-    	std::cerr<<"error: (sumZ * sumZ - ntot * sumZsquare)<1E-20"<<std::endl;
+    	std::cerr<<"regressionXZ error: (sumZ * sumZ - ntot * sumZsquare)<1E-20"<<std::endl;
     	std::cerr<<"sumZ="<<sumZ<<" sumZsquare="<<sumZsquare<<" ntot="<<sumW<<std::endl;
     	std::cerr<<cluster.size()<<" hits on "<<cluster.getNPlanesHit()<<" planes"<<std::endl;
     	throw "(sumZ * sumZ - ntot * sumZsquare)<1E-20";
@@ -102,7 +102,7 @@ FitResult2D regressionYZ(const HoughTransformer::HitCluster& cluster, double int
 
     double denominator=(sumZ * sumZ - sumW * sumZsquare);
     if(std::fabs(denominator)<1E-20){
-    	std::cerr<<"error: (sumZ * sumZ - ntot * sumZsquare)<1E-20"<<std::endl;
+    	std::cerr<<"regressionYZ error: (sumZ * sumZ - ntot * sumZsquare)<1E-20"<<std::endl;
     	std::cerr<<"sumZ="<<sumZ<<" sumZsquare="<<sumZsquare<<" ntot="<<sumW<<std::endl;
     	std::cerr<<cluster.size()<<" hits on "<<cluster.getNPlanesHit()<<" planes"<<std::endl;
     	throw "(sumZ * sumZ - ntot * sumZsquare)<1E-20";

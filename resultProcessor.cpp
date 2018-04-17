@@ -363,11 +363,12 @@ void resultProcessor::Loop()
    TProfile2D deformationsxExp("deformationsxExp", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
+   TProfile2D deformationsxNoTWC("deformationsxNoTWC", "profile of z residuals (without time walk correction);Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 5);
    TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,40,-2,2);
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,200,-2,2);
    TProfile rxByToA("rxByToA", "z-residuals by time of arival; Time of arival [ns]; z-residual [mm]", 500, 50, 300);
 
-   TH3D diffusionxToT("diffusionxToT", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm];ToT [#mus]", 50,4,24,40,-2,2,3,0,0.9);
+   TH3D diffusionxToT("diffusionxToT", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm];ToT [#mus]", 50,4,24,40,-2,2,24,0,1.2);
 
    TH2D timewalk("timewalk", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
    TH2D timewalkCorrected("timewalkCorrected", "x residual by ToT;ToT [#mus]; x-residual [mm]", 100,0,2.5, 200,-5,5);
@@ -403,7 +404,7 @@ void resultProcessor::Loop()
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
-		   jentry<nentries; //std::min(nentries,10000LL);//
+		   jentry<nentries; //std::min(nentries,50000LL);//nentries;
 		   jentry++) {
 	  if(!(jentry%1000))
 		  std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
@@ -453,6 +454,7 @@ void resultProcessor::Loop()
 		  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
 		  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, hryp ); //todo: check where XZ slope enters
 		  deformationsx.Fill( h.col, h.row, h.rx );
+		  deformationsxNoTWC.Fill(h.col, h.row, h.rx+dxTW);
 		  deformationsy.Fill( h.col, h.row, hryp ); //todo: check where XZ slope enters
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
@@ -544,10 +546,10 @@ void resultProcessor::Loop()
    gStyle->SetPalette(kRainBow);
 
 
-   std::vector<double> errorVector={0.005, .020, 0.005, .020};
-   std::vector<double> minmaxVector={0.1,0.2,0.1,0.2};
+   std::vector<double> errorVector={0.005, .020, 0.005, .020,3};
+   std::vector<double> minmaxVector={0.1,0.2,0.1,0.2,3};
    auto error=errorVector.begin(), minmax=minmaxVector.begin();
-   for(auto d : {&deformationsy, &deformationsx, &deformationsyExp, &deformationsxExp} ) {
+   for(auto d : {&deformationsy, &deformationsx, &deformationsyExp, &deformationsxExp, &deformationsxNoTWC} ) {
 	   d=removeBinsWithFewerEntries(d, 100);
 	   getFrequencyHistogram(d, *error++);
 	   double max=*minmax++;
