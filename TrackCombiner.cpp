@@ -180,8 +180,10 @@ std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
 
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0y);
 		double ds=timePixChip.driftSpeed;
-		double dx0=0.1764; //1.56*1.56*ds*ds/12.+...  //1.56 ns is timePix3 time resolution
-		h.error2x=Dx*Dx*(h.x-z0x)+dx0*dx0;
+//		double dx0=0.1764; //1.56*1.56*ds*ds/12.+more!  //1.56 ns is timePix3 time resolution CONSTANT
+		double dx0=0.000; //IF ToT contribution is calculation
+		double dxToT=0.0796/(h.ToT/40.);
+		h.error2x=Dx*Dx*(h.x-z0x)+dx0*dx0+dxToT*dxToT;
 	}
 	return hits;
 }
