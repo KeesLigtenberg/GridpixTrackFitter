@@ -364,7 +364,7 @@ void resultProcessor::Loop()
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsxNoTWC("deformationsxNoTWC", "profile of z residuals (without time walk correction);Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 5);
-   TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,40,-2,2);
+   TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,200,-2,2);
    TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,200,-2,2);
    TProfile rxByToA("rxByToA", "z-residuals by time of arival; Time of arival [ns]; z-residual [mm]", 500, 50, 300);
 
@@ -446,16 +446,18 @@ void resultProcessor::Loop()
 
     	  hitmap.Fill( h.col, h.row );
 
-    	  if(h.flag<0) continue;
-
     	  //have a chance to drop hits
     	  if(dropHits and gRandom->Rndm() > targetNumberOfHits/actualNumberOfHits) continue;
 
-		  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
-		  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, hryp ); //todo: check where XZ slope enters
-		  deformationsx.Fill( h.col, h.row, h.rx );
-		  deformationsxNoTWC.Fill(h.col, h.row, h.rx+dxTW);
-		  deformationsy.Fill( h.col, h.row, hryp ); //todo: check where XZ slope enters
+    	  if(h.flag>=0 || h.flag==-11 ) {
+			  deformationsxExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, h.rx );
+			  deformationsyExp.Fill( h.col-h.rz/.055, h.row+h.ry/.055, hryp ); //todo: check where XZ slope enters
+			  deformationsx.Fill( h.col, h.row, h.rx );
+			  deformationsxNoTWC.Fill(h.col, h.row, h.rx+dxTW);
+			  deformationsy.Fill( h.col, h.row, hryp ); //todo: check where XZ slope enters
+    	  }
+
+    	  if(h.flag<0) continue;
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
 
