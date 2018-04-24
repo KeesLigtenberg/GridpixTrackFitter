@@ -35,10 +35,13 @@ public:
 
 	void save(std::ostream&) const;
 	void load(std::istream&);
+
+	const std::vector<double>& getParameters() const {return params;}
+
 private:
 	double minToT{0.15};
-	std::vector<double> params{};
 	std::unique_ptr<TF1> fun{};
+	std::vector<double> params{};
 	std::string funString{};
 };
 
@@ -55,8 +58,8 @@ struct RelativeAligner {
 
 	TVector3 getCOM() const { return timepixCOM-shift; };//COM in mirrored timepix frame!
 
-	TVector3 shift, timepixCOM; //com in telescope frame!
-	std::array<double, 3> angle; //X, Y, Z
+	TVector3 shift, timepixCOM; //com in telescope frame! (In timepix paper coordinates z,y,x
+	std::array<double, 3> angle; //X, Y, Z ( In timepix paper coordinates: z,y,x )
 };
 
 struct MimosaAligner {

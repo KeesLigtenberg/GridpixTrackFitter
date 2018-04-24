@@ -172,17 +172,18 @@ BufferedTreeFiller::TreeEntry& putResidualsInEntry(
 	return treeEntry;
 }
 
-std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits) {
+std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits, const TimeWalkCorrector& twc) {
 	for(auto& h : hits) {
 		//TODO: move these values to alignment
-		double Dy=0.308/sqrt(10), Dx=0.253/sqrt(10);
-		double z0y=3.816, z0x=z0y;
+		double Dy=0.289/sqrt(10), Dx=0.259/sqrt(10);
+		double z0y=3.69, z0x=z0y;
 
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0y);
 		double ds=timePixChip.driftSpeed;
 //		double dx0=0.1764; //1.56*1.56*ds*ds/12.+more!  //1.56 ns is timePix3 time resolution CONSTANT
-		double dx0=0.000; //IF ToT contribution is calculation
-		double dxToT=0.0796/(h.ToT/40.);
+		double dx0=0.056; //IF ToT contribution is calculation
+		double ToT=h.ToT/40.-twc.getParameters()[2];
+		double dxToT=twc.getParameters()[1]*(0.017+ToT*0.105)/pow(ToT,2);
 		h.error2x=Dx*Dx*(h.x-z0x)+dx0*dx0+dxToT*dxToT;
 	}
 	return hits;
@@ -212,6 +213,12 @@ std::vector<PositionHit>& eraseOutsideArea(std::vector<PositionHit>& spaceHit) {
 			} ),
 			spaceHit.end()
 	);
+	return spaceHit;
+}
+
+HoughTransformer::HitCluster& flagHitsOutsideArea(HoughTransformer::HitCluster& spaceHit) {
+	for(auto& h : spaceHit)
+				if( not goodArea::isInsideArea(h.column,h.row) ) h.flag=-11;
 	return spaceHit;
 }
 
@@ -273,7 +280,7 @@ void TrackCombiner::processTracks() {
 //		auto tpcHits=tpcFitter.getSpaceHitsWithCrossTalk(alignment.timeWalkCorrection); //timewalk for cross-talk insertion
 		if( !tpcFitter.passEvent(tpcHits) ) { replaceStatus(3, "Less than 30 hits in tpc", tpcEntryNumber); continue; }
 		tpcHits=tpcFitter.rotateAndShift(tpcHits); //just a shift!
-		if(onlyUseInArea) tpcHits=eraseOutsideArea(tpcHits);
+//		if(onlyUseInArea) tpcHits=eraseOutsideArea(tpcHits);
 		if(correctToTByCol) tpcHits=ToTCorrection.correct(tpcHits);
 		if(correctTimewalk) tpcHits=alignment.timeWalkCorrection.correct(tpcHits);
 		auto tpcHitsInTimePixFrame=tpcHits;//copy hits before rotation
@@ -288,11 +295,12 @@ void TrackCombiner::processTracks() {
 			h.RotatePosition(alignment.relativeAlignment.angle[2], rotationCOM, {0,0,1});
 			h.SetPosition(h.getPosition() + timepixShift);
 		}
-		tpcHits=setTPCErrors(tpcHits); //set tpc Errors based on position above grid
+		tpcHits=setTPCErrors(tpcHits, alignment.timeWalkCorrection); //set tpc Errors based on position above grid
 		auto tpcClusters = tpcFitter.houghTransform(tpcHits);
 		if(tpcClusters.size()>1) { auto mes="More than one cluster in tpc"; replaceStatus(5, mes, tpcEntryNumber); continue; };
 		vector<HoughTransformer::HitCluster> tpcFittedClusters;
 		for( auto& cluster : tpcClusters ) {
+			if(onlyUseInArea) cluster=flagHitsOutsideArea(cluster);
 			if(cluster.getNHitsUnflagged()<2) continue;
 			auto fit=regressionFit3d(cluster);
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
@@ -390,10 +398,10 @@ void TrackCombiner::processTracks() {
 						}
 
 						splitTpcCluster.first.add( lastPlaneCrossing );
-						auto combinedFit=regressionFit3d(splitTpcCluster.first);
-						combinedFits.push_back(combinedFit);
+						auto splitPlusOneFit=regressionFit3d(splitTpcCluster.first);
+						combinedFits.push_back(splitPlusOneFit);
 
-						treeEntry=putResidualsInEntry(treeEntry, splitTpcCluster.second, combinedFit, alignment);// combinedFit
+						treeEntry=putResidualsInEntry(treeEntry, splitTpcCluster.second, splitPlusOneFit, alignment);// combinedFit
 					} else {
 						treeEntry=putResidualsInEntry(treeEntry, tpcFittedClusters.at(iFit), tpcPlusOneFit, alignment);
 					}
