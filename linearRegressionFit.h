@@ -92,7 +92,8 @@ std::vector<Residual> calculateResiduals( const HoughTransformer::HitCluster& cl
 TVector3 averageResidual(const std::vector<Residual>& residuals);
 
 HoughTransformer::HitCluster& cutOnResiduals( HoughTransformer::HitCluster& cluster, const std::vector<Residual>& residuals, double maxResidual );
-HoughTransformer::HitCluster& cutOnResidualPulls( HoughTransformer::HitCluster& cluster, const std::vector<Residual>& residuals, double maxPull );
+HoughTransformer::HitCluster& cutOnResidualPulls( HoughTransformer::HitCluster& cluster, const std::vector<Residual>& residuals, double maxPullx, double maxPully );
+HoughTransformer::HitCluster& cutOnResidualPullsWithFitError( HoughTransformer::HitCluster& cluster, const FitResult3D& fit, double maxPullx, double maxPully );
 
 inline
 std::ostream& operator<<(std::ostream& os, const FitResult3D& fit) {

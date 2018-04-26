@@ -177,19 +177,29 @@ HoughTransformer::HitCluster& cutOnResidualPulls(
 		const std::vector<Residual>& residuals, double maxPullx, double maxPully) {
 	auto res=residuals.begin();
 	int nremoved=cluster.size();
-//	//no erase necessary because list version of remove_if
-//	cluster.remove_if( [&res, &maxPull](const PositionHit&h){
-//		bool cut= res->x*res->x/h.error2x > maxPull*maxPull or res->y*res->y/h.error2y > maxPull*maxPull;
-//		++res;
-//		return cut;
-//	} );
 	for(auto& h : cluster) {
 		if( res->x*res->x/h.error2x > maxPullx*maxPullx) h.flag=-1;
 		if( res->y*res->y/h.error2y > maxPully*maxPully) { h.flag=-2;}
 		++res;
 	}
-
 	nremoved-=cluster.size();
-//	std::cout<<"Removed "<<nremoved<<" hits"<<std::endl;
+	return cluster;
+}
+
+
+HoughTransformer::HitCluster& cutOnResidualPullsWithFitError(
+		HoughTransformer::HitCluster& cluster,
+		const FitResult3D& fit,
+		double maxPullx,
+		double maxPully ) {
+	int nremoved=cluster.size();
+	for(auto& h : cluster) {
+		auto res=calculateResidual(h,fit);
+		double xerror2=h.error2x+fit.XZ.error2At(h.z);
+		double yerror2=h.error2y+fit.YZ.error2At(h.z);
+		if( res.x*res.x/xerror2 > maxPullx*maxPullx) h.flag=-1;
+		if( res.y*res.y/yerror2 > maxPully*maxPully) { h.flag=-2;}
+	}
+	nremoved-=cluster.size();
 	return cluster;
 }

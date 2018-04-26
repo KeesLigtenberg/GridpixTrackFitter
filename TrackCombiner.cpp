@@ -306,7 +306,8 @@ void TrackCombiner::processTracks() {
 			if(!fit.isValid()) {cerr<<"fit not valid!"<<endl; cin.get(); continue;	}
 			auto residuals=calculateResiduals(cluster, fit);
 //			cout<<cluster.size();
-			cluster=cutOnResidualPulls(cluster, residuals, 3, 2);
+			cluster=cutOnResidualPullsWithFitError(cluster, fit, 3, 2);
+//			cluster=cutOnResidualPulls(cluster, residuals, 4, 3);
 //			cluster=cutOnResidualPulls(cluster, residuals, 5, 5);
 //			cout<<" - "<<cluster.size()<<"\n";
 //			cluster=flagHitsInColumn(cluster);
@@ -455,10 +456,10 @@ void TrackCombiner::processTracks() {
 		while(not tpcEntryHasMatchingFit.empty() and tpcEntryHasMatchingFit.front()<tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin) ) tpcEntryHasMatchingFit.pop_front();
 
 		//display event
-		if( displayEvent ) { //and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
-//			drawEvent(tpcHits, telescopeFits);
+		if( displayEvent and tpcPlusOneFits.front().xAt(timePixChip.zmean())<6 ) { //and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
+			drawEvent(tpcHits, tpcPlusOneFits);
 //			drawEvent(tpcFittedClusters.front(), tpcFits);
-			drawEvent(tpcFittedClusters.front(), combinedFits);
+//			drawEvent(tpcFittedClusters.front(), combinedFits);
 //			{	HoughTransformer::drawCluster(tpcHits, combinedSetupForDrawing);
 //				for (auto& f : telescopeFits)
 //					f.draw(combinedSetupForDrawing.zmin(), combinedSetupForDrawing.zmax());
