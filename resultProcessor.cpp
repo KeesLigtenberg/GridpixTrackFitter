@@ -364,8 +364,8 @@ void resultProcessor::Loop()
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsxNoTWC("deformationsxNoTWC", "profile of z residuals (without time walk correction);Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 5);
-   TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,200,-2,2);
-   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,200,-2,2);
+   TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,50,-2,2);
+   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,50,-2,2);
    TProfile rxByToA("rxByToA", "z-residuals by time of arival; Time of arival [ns]; z-residual [mm]", 500, 50, 300);
 
    TH3D diffusionxToT("diffusionxToT", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm];ToT [#mus]", 50,4,24,40,-2,2,24,0,1.2);
@@ -386,6 +386,9 @@ void resultProcessor::Loop()
    TH1D pairToTMinControl("pairToTMinControl","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
    TH1D pairToTMaxControl("pairToTMaxControl","ToT of isolated hits;ToT [#mu s];Entries", 40,0,2);
    TH1D pairZDiffControl("pairZDiffControl", "Z-diff of isolated hit-pairs;#Delta z [mm];Entries", 30,0,3.515625);
+
+   TH1D fitErrorY("fitErrorY", "y-error of fitted track in center of chip;Error [#mum]; Entries", 40,0,0.2);
+   TH1D fitErrorX("fitErrorX", "z-error of fitted track in center of chip;Error [#mum]; Entries", 40,0,0.2);
 
    std::deque<int> aggravatedHits;
    std::vector<int> hitsAlongTrack(512);
@@ -421,7 +424,14 @@ void resultProcessor::Loop()
 
  	 int nHitsInsideArea=0;
 
-      for(auto& h : timepixHits->front() ) {
+ 	 //fill fit histograms
+ 	 auto& fit=timepixFits->front();
+ 	 double chipZMean=alignment.relativeAlignment.shift.Z()+timePixChip.zmean();
+ 	 fitErrorX.Fill( fit.XZ.errorAt( chipZMean ) );
+ 	 fitErrorY.Fill( fit.YZ.errorAt( chipZMean ) );
+
+ 	 //fill hit histograms
+     for(auto& h : timepixHits->front() ) {
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
     	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
     	  if(h.ToT*0.025>0.15) crosstalkZ.Fill(h.col,h.row,h.x+dxTW);
@@ -546,7 +556,6 @@ void resultProcessor::Loop()
 
    }
    gStyle->SetPalette(kRainBow);
-
 
    std::vector<double> errorVector={0.005, .020, 0.005, .020,3};
    std::vector<double> minmaxVector={0.1,0.2,0.1,0.2,3};
