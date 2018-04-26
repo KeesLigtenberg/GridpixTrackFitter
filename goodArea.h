@@ -21,7 +21,8 @@ namespace goodArea {
 		if(x<=xmin or x>=xmax) {return false;}
 		if( (y<= ybl-(ybl-ybr)/double(xmax-xmin)*(x-xmin))
 		 or (y>= yul-(yul-yur)/double(xmax-xmin)*(x-xmin)) ) { return false; }
-		if(excluded1.IsInside(x,y) or excluded2.IsInside(x,y)) { return false; }
+		if(excluded1.IsInside(x,y)) { return false; }
+//		if(excluded2.IsInside(x,y)) { return false; }
 		return true;
 	}
 }
