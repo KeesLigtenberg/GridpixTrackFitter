@@ -58,6 +58,7 @@ public:
 	};
 	std::vector<PlaneHistograms> planeHist;
 	TProfile xResidualByToT;
+	TH1D ToT;
 
 };
 

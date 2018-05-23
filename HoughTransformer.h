@@ -321,7 +321,8 @@ inline void HoughTransformer::drawCluster(const T& cluster, const DetectorConfig
 
 	for(auto& iHit : cluster ) {
 		h=iHit;
-		if(h.flag>0) pointTree.Fill();
+		if(h.flag>0)
+			pointTree.Fill();
 	}
 
 	gStyle->SetMarkerStyle(20);
