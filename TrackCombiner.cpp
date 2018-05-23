@@ -175,15 +175,16 @@ BufferedTreeFiller::TreeEntry& putResidualsInEntry(
 std::vector<PositionHit>& setTPCErrors(std::vector<PositionHit>& hits, const TimeWalkCorrector& twc) {
 	for(auto& h : hits) {
 		//TODO: move these values to alignment
-		double Dy=0.289/sqrt(10), Dx=0.259/sqrt(10);
-		double z0y=3.69, z0x=z0y;
+		double Dy=0.308/sqrt(10), Dx=0.227/sqrt(10);
+		double z0y=4.22, z0x=z0y;
 
 		h.error2y=.055*.055/12.+Dy*Dy*(h.x-z0y);
 		double ds=timePixChip.driftSpeed;
 //		double dx0=0.1764; //1.56*1.56*ds*ds/12.+more!  //1.56 ns is timePix3 time resolution CONSTANT
-		double dx0=0.056; //IF ToT contribution is calculation
+		double dx0=0.117; //IFF ToT contribution is calculation
 		double ToT=h.ToT/40.-twc.getParameters()[2];
-		double dxToT=twc.getParameters()[1]*(0.017+ToT*0.105)/pow(ToT,2);
+		double k0=0.037, k1=0.064;
+		double dxToT=twc.getParameters()[1]*(k0+ToT*k1)/pow(ToT,2);
 		h.error2x=Dx*Dx*(h.x-z0x)+dx0*dx0+dxToT*dxToT;
 	}
 	return hits;
@@ -237,7 +238,7 @@ void TrackCombiner::processTracks() {
 	nTelescopeTriggers=0;
 	telescopeFitter.getEntry(previousTriggerNumberBegin);
 	for(int telescopeEntryNumber=0,tpcEntryNumber=0; //5000000, 2308829
-			telescopeEntryNumber<1E5//telescopeFitter.nEvents//1000000
+			telescopeEntryNumber<2E6//telescopeFitter.nEvents//1000000
 			;) {
 		triggerStatusHistogram.reset();
 		// Get Entry and match trigger Numbers
@@ -411,7 +412,7 @@ void TrackCombiner::processTracks() {
 					telescopeFitIsMatched[jFit]=true;
 					tpcFitIsMatched[iFit]=true;
 					break;
-				} else if (displayEvent) {
+				} else if (false && displayEvent) {
 					std::cout<<"rejected with differences: "<<tpcFit.xAt(timepixShift.z()+timePixChip.zmean())-telescopeFit.xAt(timepixShift.z()+timePixChip.zmean())
 						<<", "<<tpcFit.yAt(timepixShift.z()+timePixChip.zmean())-telescopeFit.yAt(timepixShift.z()+timePixChip.zmean())<<"\n";
 				}
@@ -427,7 +428,7 @@ void TrackCombiner::processTracks() {
 			if( telescopeFits.empty() || tpcFits.empty() ) {
 				auto message= atLeastOneThroughDetector ? "Telescope and tpc fits do not match" : "Telescope fit missed tpc";
 				replaceStatus(10, message, tpcEntryNumber);
-				if(displayEvent) cout<<"telescope and tpc fits do not match!"<<endl;
+				if(false && displayEvent) cout<<"telescope and tpc fits do not match!"<<endl;
 				continue;
 			}
 		}
@@ -456,7 +457,7 @@ void TrackCombiner::processTracks() {
 		while(not tpcEntryHasMatchingFit.empty() and tpcEntryHasMatchingFit.front()<tpcEntryNumber-(telescopeFitter.triggerNumberEnd-telescopeFitter.triggerNumberBegin) ) tpcEntryHasMatchingFit.pop_front();
 
 		//display event
-		if( displayEvent and tpcPlusOneFits.front().xAt(timePixChip.zmean())<6 ) { //and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
+		if( displayEvent and tpcHits.size()>300 and tpcFittedClusters.front().getNHitsUnflagged()*1./tpcFittedClusters.front().size()>0.75  ) { //and getMaxNumberOfEmptyRows(tpcHits)>50 and tpcHits.size()*1./tpcFittedClusters.front().size()>0.95) {
 			drawEvent(tpcHits, tpcPlusOneFits);
 //			drawEvent(tpcFittedClusters.front(), tpcFits);
 //			drawEvent(tpcFittedClusters.front(), combinedFits);

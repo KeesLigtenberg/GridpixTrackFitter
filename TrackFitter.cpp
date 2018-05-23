@@ -341,13 +341,15 @@ void trackFitter::saveAlignment(std::string file) {
 }
 
 bool trackFitter::processDrawSignals() {
-	static bool printed=false;
-	if(not printed) { cout<<"<return> to continue, 'q' to break\n"; printed=true; };
+	static bool printedInfo=false;
+	static bool pdfOpen=false;
+	if(not printedInfo) { cout<<"<return> to continue, 'q' to break\n"; printedInfo=true; };
 
 	auto signal = std::cin.get();
-	if (signal == 'q')
+	if (signal == 'q') {
+		if(pdfOpen) {gPad->Print("eventDisplays.pdf]"); pdfOpen=false; }//close pdf
 		return true;
-	else if (signal == 'l') {
+	} else if (signal == 'l') {
 		while (!gSystem->ProcessEvents()) {
 			gSystem->Sleep(50);
 		}
@@ -361,6 +363,13 @@ bool trackFitter::processDrawSignals() {
 			gPad->Update();
 			gPad->Print( thetaView == 358 ?	"eventAnimation.gif++5++" : "eventAnimation.gif+5");
 //			gPad->Print(( "eventAnimation"+to_string(thetaView/2)+".png" ).c_str());
+		}
+	} else if (signal == 'a') {
+		if(not pdfOpen) {
+			gPad->Print("eventDisplays.pdf(");
+			pdfOpen=true;
+		} else {
+			gPad->Print("eventDisplays.pdf");
 		}
 	}
 	return false;
