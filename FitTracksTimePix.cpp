@@ -30,7 +30,7 @@
 
 using namespace std;
 
-void FitTracksTimePix(std::string inputfile) {
+void FitTracksTimePix(std::string inputfile, std::string outputfile="timepixHistograms.root") {
 
 	//get tree from file
 	TimePixFitter tpcFitter(inputfile,timePixChip);
@@ -42,9 +42,9 @@ void FitTracksTimePix(std::string inputfile) {
 	tpcFitter.houghTransform.minCandidateSize=6;
 	tpcFitter.houghTransform.minClusterSize=10;
 
-	tpcFitter.displayEvent=true;
+	tpcFitter.displayEvent=false;
 
-	tpcFitter.fitTracks("timepixHistograms.root");
+	tpcFitter.fitTracks(outputfile);
 
 }
 

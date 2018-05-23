@@ -75,6 +75,9 @@ private:
 	const DetectorConfiguration& detector;
 	std::unique_ptr<ResidualHistogrammer> residualHistograms;
 	std::unique_ptr<TrackHistogrammer> trackHistograms;
+	TH1D* numberOfHitsInTrack;
+	TH1D* ToTOfHitsInTrack;
+
 
 	bool passEvent(const std::vector<PositionHit>& spaceHit ) const;	//return true if the event is passed
 
