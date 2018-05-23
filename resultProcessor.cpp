@@ -176,7 +176,7 @@ namespace {
 
 
 	//do frequency on an unweighted histogram, i.e. all entreis should have same weight
-	void getFrequencyHistogram(TProfile2D* original, double systematicError, double min=-0.2, double max=0.2, int nBins=80, double entryWeight=1.0) {
+	void getFrequencyHistogram(TProfile2D* original, double systematicError, double min=-0.1, double max=0.1, int nBins=80, double entryWeight=1.0) {
 		TH1D* frequencyHist=new TH1D(
 			(original->GetName()+std::string("freq")).c_str(),
 			(original->GetTitle()+std::string(" frequency;")+original->GetZaxis()->GetTitle()+";" ).c_str(),
@@ -358,14 +358,14 @@ void resultProcessor::Loop()
 
    TH2D hitmap("hitmap", "map of hits in tracks", 256,0,256,256,0,256 );
    TProfile ToTByCol("ToTByCol", "ToT by column", 256,0,256, 0, 4);
-   const int nbins=256;//64;
+   const int nbins=64;//64;
    TProfile2D deformationsyExp("deformationsyExp", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsxExp("deformationsxExp", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsy("deformationsy", "profile of y residuals;Column;Row;y-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsx("deformationsx", "profile of z residuals;Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 1);
    TProfile2D deformationsxNoTWC("deformationsxNoTWC", "profile of z residuals (without time walk correction);Column;Row;z-residual [mm]", nbins, 0, 256, nbins, 0, 256, -1, 5);
-   TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 50,4,24,50,-2,2);
-   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 50,4,24,50,-2,2);
+   TH2D diffusionx("diffusionx", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm]", 100,4,24,50,-2,2);
+   TH2D diffusiony("diffusiony", "y residuals as a function of drift distance;Drift distance [mm];y-residual [mm]", 100,4,24,50,-2,2);
    TProfile rxByToA("rxByToA", "z-residuals by time of arival; Time of arival [ns]; z-residual [mm]", 500, 50, 300);
 
    TH3D diffusionxToT("diffusionxToT", "z residuals as a function of drift distance;Drift distance [mm];z-residual [mm];ToT [#mus]", 50,4,24,40,-2,2,24,0,1.2);
@@ -390,6 +390,10 @@ void resultProcessor::Loop()
    TH1D fitErrorY("fitErrorY", "y-error of fitted track in center of chip;Error [#mum]; Entries", 40,0,0.2);
    TH1D fitErrorX("fitErrorX", "z-error of fitted track in center of chip;Error [#mum]; Entries", 40,0,0.2);
 
+   TH1D residualsx("residualsx", "x-residual; x-residual [mm]; Hits", 100,-2,2);
+   TH1D residualsxNoTWC("residualsxNoTWC", "x-residual; x-residual [mm]; Hits", 100,-2,2);
+
+
    std::deque<int> aggravatedHits;
    std::vector<int> hitsAlongTrack(512);
    TTree binnedHitsTree("binnedHitsTree", "tree with hits per track");
@@ -407,7 +411,7 @@ void resultProcessor::Loop()
 
    Long64_t nbytes = 0, nb = 0;
    for (Long64_t jentry=0;
-		   jentry<nentries; //std::min(nentries,50000LL);//nentries;
+		   jentry<nentries; //std::min(nentries,10000LL);//nentries;
 		   jentry++) {
 	  if(!(jentry%1000))
 		  std::cout<<"entry "<<jentry<<"/"<<nentries<<"\n";
@@ -434,6 +438,7 @@ void resultProcessor::Loop()
      for(auto& h : timepixHits->front() ) {
     	  crosstalk.Fill(h.col,h.row,h.ToT*0.025);
     	  double dxTW=alignment.timeWalkCorrection.getCorrection(h.ToT);//time walk correction
+    	  double dxTWLimit=alignment.timeWalkCorrection.getCorrection(10/0.025);//time walk correction
     	  if(h.ToT*0.025>0.15) crosstalkZ.Fill(h.col,h.row,h.x+dxTW);
 
     	  if(h.flag==-3 or h.flag>=-1) {
@@ -470,6 +475,9 @@ void resultProcessor::Loop()
     	  if(h.flag<0) continue;
 
     	  ToTByCol.Fill(h.col, h.ToT*0.025);
+    	  residualsx.Fill(h.rx);
+    	  residualsxNoTWC.Fill(h.rx+dxTW-dxTWLimit-1);
+
 
     	  //calculate xy
     	  double xInTimepixFrame=0.055*h.col;
